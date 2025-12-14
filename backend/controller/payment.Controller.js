@@ -230,6 +230,128 @@ const getPaymentsById= async (req,res)=>{
   }
 }
 
+const deletePayment = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Step 1: Validate payment exists
+    const payment = await Payment.findById(id)
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Payment not found'
+      })
+    }
+
+    // Step 2: Verify payment belongs to logged-in user
+    if (payment.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this payment'
+      })
+    }
+
+    // Step 3: Get invoice details before deletion
+    const invoice = await Invoice.findById(payment.invoiceId)
+
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Associated invoice not found'
+      })
+    }
+
+    // Step 4: Get client details
+    const client = await Client.findById(payment.clientId)
+
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: 'Associated client not found'
+      })
+    }
+
+    // Step 5: Check if payment is on-time or late (for reverting stats)
+    const paymentDateObj = new Date(payment.paymentDate)
+    const dueDateObj = new Date(invoice.dueDate)
+    const wasOnTime = paymentDateObj <= dueDateObj
+
+    // Step 6: Delete the payment record
+    await Payment.findByIdAndDelete(id)
+
+    // Step 7: Revert invoice status back to sent/draft (not paid)
+    await Invoice.findByIdAndUpdate(
+      payment.invoiceId,
+      {
+        status: 'sent',
+        paidAt: null,
+        paymentMethod: null
+      }
+    )
+
+    // Step 8: Revert client payment stats
+    const updateData = {
+      $inc: {
+        'paymentStats.totalPaid': -payment.amount,
+        'paymentStats.totalUnpaid': payment.amount
+      }
+    }
+
+    // Revert on-time or late payment count
+    if (wasOnTime) {
+      updateData.$inc['paymentStats.onTimePayments'] = -1
+    } else {
+      updateData.$inc['paymentStats.latePayments'] = -1
+    }
+
+    await Client.findByIdAndUpdate(payment.clientId, updateData)
+
+    // Step 9: Recalculate client's payment reliability score
+    const updatedClient = await Client.findById(payment.clientId)
+    const newReliabilityScore = updatedClient.calculateReliabilityScore()
+
+    await Client.findByIdAndUpdate(
+      payment.clientId,
+      {
+        'paymentStats.paymentReliabilityScore': newReliabilityScore
+      }
+    )
+
+    // Step 10: Return success response
+    res.status(200).json({
+      success: true,
+      message: 'Payment deleted successfully',
+      data: {
+        deletedPaymentId: id,
+        invoiceId: payment.invoiceId,
+        clientId: payment.clientId,
+        amount: payment.amount,
+        paymentMethod: payment.paymentMethod
+      },
+      updatedInvoice: {
+        status: 'sent',
+        paidAt: null
+      },
+      updatedClientStats: {
+        totalPaid: updatedClient.paymentStats.totalPaid - payment.amount,
+        totalUnpaid: updatedClient.paymentStats.totalUnpaid + payment.amount,
+        paymentReliabilityScore: newReliabilityScore,
+        onTimePayments: wasOnTime ? updatedClient.paymentStats.onTimePayments - 1 : updatedClient.paymentStats.onTimePayments,
+        latePayments: wasOnTime ? updatedClient.paymentStats.latePayments : updatedClient.paymentStats.latePayments - 1
+      }
+    })
+  } catch (error) {
+    console.error('Delete payment error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting payment',
+      error: error.message
+    })
+  }
+}
 
 
-export { recordPayment,getPayments,getPaymentsById, }
+
+
+export { recordPayment,getPayments,getPaymentsById,deletePayment }

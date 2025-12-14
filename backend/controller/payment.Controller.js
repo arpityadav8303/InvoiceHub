@@ -195,4 +195,41 @@ const getPayments = async (req, res) => {
   }
 };
 
-export { recordPayment,getPayments }
+const getPaymentsById= async (req,res)=>{
+  try {
+    const {id}=req.params;
+    const payment=await Payment.findById(id);
+    if(!payment){
+      return res.status(404).json({
+        success:false,
+        message:'Payment not found'
+      })
+    }
+    
+    if(payment.userId.toString()!==req.user._id.toString()){
+      return res.status(403).json({
+        success:false,
+        message:'Not authorized to access this payment'
+      })
+    }
+    
+    return res.status(200).json({
+      success:true,
+      message:'Payment fetched successfully',
+      payment:payment
+    })
+
+
+  } catch (error) {
+     return res.status(500).json({
+      success:false,
+      message:'Error fetching payment',
+      error:error.message
+    })
+
+  }
+}
+
+
+
+export { recordPayment,getPayments,getPaymentsById, }

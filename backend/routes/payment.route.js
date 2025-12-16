@@ -8,6 +8,6 @@ const router = express.Router()
 router.post('/', protect, validate(paymentCreateSchema), recordPayment)
 router.get('/', protect, getPayments)
 router.get('/:id', protect, getPaymentsById)
-router.delete('/:id', protect, validate(paymentUpdateSchema), deletePayment)
+router.delete('/:id', protect,deletePayment)
 
 export default router

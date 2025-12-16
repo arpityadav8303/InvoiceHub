@@ -103,8 +103,8 @@ const loginSchema = Joi.object({
         .trim(),
     
     password: Joi.string()
-        .min(8)
-        .required()
+      .min(6)
+      .required()
 });
 
 export {registerSchema,loginSchema};

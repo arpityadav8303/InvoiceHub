@@ -1,12 +1,6 @@
 import Joi from 'joi';
 
 const clientValidationSchema = Joi.object({
-  userId: Joi.string()
-    .required()
-    .messages({
-      "any.required": "User ID is required"
-    }),
-
   firstName: Joi.string()
     .required()
     .min(2)

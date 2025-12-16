@@ -34,7 +34,7 @@ const createInvoice =async(req,res)=>{
           quantity: item.quantity,
           rate: item.rate,
           amount: item.quantity * item.rate
-        }))
+      }))
 
         const newInvoice = new Invoice({
           userId: req.user._id,
@@ -53,7 +53,7 @@ const createInvoice =async(req,res)=>{
 
       await newInvoice.save()
 
-       await Client.findByIdAndUpdate(
+      await Client.findByIdAndUpdate(
       clientId,
       {
         $inc: {

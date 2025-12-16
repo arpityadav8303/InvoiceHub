@@ -141,4 +141,4 @@ invoiceSchema.methods.getDaysOverdue = function() {
 const Invoice = mongoose.model('Invoice', invoiceSchema)
 
 // module.exports = Invoice
-export default Invoice
+export default Invoice 

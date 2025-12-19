@@ -13,40 +13,33 @@ export const sendPaymentReminder = async (req, res) => {
 
     // Validate invoice exists and belongs to user
     const invoice = await Invoice.findById(invoiceId);
-
     if (!invoice) {
-      return res.status(404).json({
-        success: false,
-        message: 'Invoice not found'
-      });
+      return res.status(404).json({ success: false, message: "Invoice not found" });
     }
 
     if (invoice.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to send reminder for this invoice'
-      });
+      return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
     // Get client details
     const client = await Client.findById(invoice.clientId);
-
     if (!client) {
-      return res.status(404).json({
-        success: false,
-        message: 'Client not found'
-      });
+      return res.status(404).json({ success: false, message: "Client not found" });
     }
 
-    // Generate email content (with fallback to template)
+    console.log("Reminder request:", { invoiceId, clientEmail: client.email });
+
+    // Generate email content
     const emailContent = await generateClientReminderSmart(invoice, client);
 
-    // Send email
-    await sendEmail(
+    // Send email (positional args, same as test-services.js)
+    const emailResult = await sendEmail(
       client.email,
       emailContent.subject,
       emailContent.body_html
     );
+
+    console.log("Email sent:", emailResult.messageId);
 
     // Update invoice emailSentAt timestamp
     invoice.emailSentAt = new Date();
@@ -54,22 +47,21 @@ export const sendPaymentReminder = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Payment reminder sent successfully',
+      message: "Payment reminder sent successfully",
       data: {
         invoiceId: invoice._id,
         clientEmail: client.email,
         clientName: `${client.firstName} ${client.lastName}`,
         emailSentAt: invoice.emailSentAt,
-        subject: emailContent.subject
-      }
+        subject: emailContent.subject,
+      },
     });
-
   } catch (error) {
-    console.error('Send payment reminder error:', error);
+    console.error("Send payment reminder error:", error);
     res.status(500).json({
       success: false,
-      message: 'Error sending payment reminder',
-      error: error.message
+      message: "Error sending payment reminder",
+      error: error.message,
     });
   }
 };

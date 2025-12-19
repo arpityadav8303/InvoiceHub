@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Use flash model (cheaper)
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Use flash model (cheaper)
 
 /**
  * Generate a professional payment reminder email using Google Gemini AI
@@ -13,15 +13,27 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Use fl
  * @returns {Object} - { subject: string, body_html: string }
  */
 export const generateClientReminder = async (invoice, client) => {
-  const prompt = `Generate a payment reminder email. Return ONLY valid JSON.
+  const prompt = `Generate a professional, visually appealing payment reminder email. 
+Return ONLY valid JSON with "subject" and "body_html" keys.
+
+Requirements:
+- Use a clean HTML structure with inline CSS styling.
+- Include a header with the company name styled in a modern way.
+- Add a highlighted section (card-style box) for invoice details.
+- Use subtle background colors (#f9f9f9, #007bff for accents).
+- Ensure the email is mobile-friendly and uses <div> and <table> for layout.
+- Include polite closing and company signature. 
 
 Client: ${client.firstName} ${client.lastName}
-Invoice: ${invoice.invoiceNumber}
-Amount: $${invoice.total}
-Due: ${invoice.dueDate}
+Invoice Number: ${invoice.invoiceNumber}
+Amount Due: $${invoice.total}
+Due Date: ${invoice.dueDate}
 
-Return JSON with "subject" and "body_html" keys:
-{"subject":"...","body_html":"<html>...</html>"}`;
+Return JSON like:
+{
+  "subject": "Payment Reminder: Invoice ${invoice.invoiceNumber}",
+  "body_html": "<html>...</html>"
+}`;
 
   try {
     const result = await model.generateContent(prompt);

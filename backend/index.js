@@ -7,6 +7,7 @@ import invoiceRoutes from "../backend/routes/invoice.route.js";
 import paymentRoutes from "../backend/routes/payment.route.js";
 import dayjs from "dayjs";
 import paymentReminderRoutes from "../backend/routes/paymentReminder.route.js";
+import { initScheduler } from "./Utils/scheduler.js";
 
 
 dotenv.config();
@@ -17,6 +18,7 @@ const app = express();
 app.use(express.json());
 
 connectdb();
+initScheduler();
 
 app.get("/", (req, res) => {
   res.send("API is running...");

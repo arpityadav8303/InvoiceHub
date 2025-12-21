@@ -3,15 +3,10 @@ import Client from '../models/client.model.js';
 import { sendEmail } from '../services/emailService.js';
 import { generateClientReminderSmart } from '../services/llmService.js';
 
-/**
- * Send payment reminder email for a specific invoice
- * POST /api/payment-reminder/:invoiceId
- */
 export const sendPaymentReminder = async (req, res) => {
   try {
     const { invoiceId } = req.params;
 
-    // Validate invoice exists and belongs to user
     const invoice = await Invoice.findById(invoiceId);
     if (!invoice) {
       return res.status(404).json({ success: false, message: "Invoice not found" });
@@ -21,7 +16,6 @@ export const sendPaymentReminder = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    // Get client details
     const client = await Client.findById(invoice.clientId);
     if (!client) {
       return res.status(404).json({ success: false, message: "Client not found" });
@@ -29,7 +23,6 @@ export const sendPaymentReminder = async (req, res) => {
 
     console.log("Reminder request:", { invoiceId, clientEmail: client.email });
 
-    // Generate email content
     const emailContent = await generateClientReminderSmart(invoice, client);
 
     // Send email (positional args, same as test-services.js)
@@ -66,10 +59,7 @@ export const sendPaymentReminder = async (req, res) => {
   }
 };
 
-/**
- * Send payment reminders to multiple overdue invoices
- * POST /api/payment-reminder/batch/send-overdue
- */
+
 export const sendOverdueReminders = async (req, res) => {
   try {
     // Find all overdue invoices for this user that aren't paid
@@ -142,10 +132,7 @@ export const sendOverdueReminders = async (req, res) => {
   }
 };
 
-/**
- * Send custom email to client
- * POST /api/payment-reminder/custom
- */
+
 export const sendCustomEmail = async (req, res) => {
   try {
     const { clientId, subject, htmlBody } = req.body;

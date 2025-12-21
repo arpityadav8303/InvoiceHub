@@ -130,57 +130,47 @@ const recordPayment = async (req, res) => {
 
     // ========== STEP 11.5: SEND PAYMENT CONFIRMATION EMAIL WITH PDF ==========
     try {
-      console.log('📧 Generating payment confirmation email and PDF...')
+  console.log('📧 Generating payment confirmation email and PDF...');
 
-      // Generate PDF invoice with payment details
-      pdfPath = await generateInvoicePDF(invoice, client, user, newPayment)
-      console.log(`✅ PDF generated: ${pdfPath}`)
+  // Ensure this returns a STRING path, not a Promise object
+  pdfPath = await generateInvoicePDF(invoice, client, user, newPayment);
+  console.log(`✅ PDF generated at: ${pdfPath}`);
 
-      // Generate payment confirmation email using AI
-      const emailContent = await generatePaymentConfirmationEmailSmart(
-        newPayment,
-        invoice,
-        client,
-        user
-      )
-      console.log(`✅ Email content generated`)
+  const emailContent = await generatePaymentConfirmationEmailSmart(newPayment, invoice, client, user);
 
-      // Send email with PDF attachment
-      const emailAttachments = [
-        {
-          filename: `Invoice_${invoice.invoiceNumber}.pdf`,
-          path: pdfPath
-        }
-      ]
-
-      const emailResult = await sendEmail(
-        client.email,
-        emailContent.subject,
-        emailContent.body_html,
-        emailAttachments
-      )
-
-      console.log(`✅ Payment confirmation email sent to ${client.email}`)
-      console.log(`   Message ID: ${emailResult.messageId}`)
-
-    } catch (emailError) {
-      // Don't fail the payment recording if email fails
-      console.error(
-        `⚠️  Failed to send payment confirmation email: ${emailError.message}`
-      )
-      // Continue with payment response anyway
-    } finally {
-      // Cleanup PDF file after sending
-      if (pdfPath) {
-        try {
-          await deletePDF(pdfPath)
-          console.log(`✅ Temporary PDF cleaned up`)
-        } catch (cleanupError) {
-          console.error(`⚠️  Failed to cleanup PDF: ${cleanupError.message}`)
-        }
-      }
+  const emailAttachments = [
+    {
+      filename: `Invoice_${invoice.invoiceNumber}.pdf`,
+      path: pdfPath
     }
+  ];
 
+  // Await the email sending process
+  const emailResult = await sendEmail(
+    client.email,
+    emailContent.subject,
+    emailContent.body_html,
+    emailAttachments
+  );
+
+  console.log(`✅ Payment confirmation email sent to ${client.email}`);
+
+} catch (emailError) {
+  console.error(`⚠️ Failed to send payment confirmation email: ${emailError.message}`);
+} finally {
+  // CRITICAL FIX: Ensure the file is actually deleted
+  if (pdfPath) {
+    try {
+      // Use await to ensure the file system operation finishes
+      const deleted = await deletePDF(pdfPath); 
+      if (deleted) {
+        console.log(`✅ Temporary PDF successfully cleaned up: ${pdfPath}`);
+      }
+    } catch (cleanupError) {
+      console.error(`⚠️ Failed to cleanup PDF: ${cleanupError.message}`);
+    }
+  }
+}
     // Step 12: Return success response
     res.status(201).json({
       success: true,

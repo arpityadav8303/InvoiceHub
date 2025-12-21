@@ -7,197 +7,124 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Generate a professional invoice PDF
- * @param {Object} invoice - Invoice document from DB
- * @param {Object} client - Client document from DB
- * @param {Object} user - User (company) document from DB
- * @param {Object} payment - Payment document from DB
- * @returns {string} - Path to generated PDF
+ * Generate a professional, highly-structured invoice PDF
  */
 export const generateInvoicePDF = (invoice, client, user, payment) => {
   return new Promise((resolve, reject) => {
     try {
-      // Create PDF directory if it doesn't exist
-      const pdfDir = path.join(__dirname, '../generated-pdfs');
+      const pdfDir = path.resolve(__dirname, '../generated-pdfs');
       if (!fs.existsSync(pdfDir)) {
         fs.mkdirSync(pdfDir, { recursive: true });
       }
 
-      // Generate unique filename
-      const timestamp = Date.now();
-      const pdfFileName = `Invoice_${invoice.invoiceNumber}_${timestamp}.pdf`;
+      const pdfFileName = `Invoice_${invoice.invoiceNumber}_${Date.now()}.pdf`;
       const pdfPath = path.join(pdfDir, pdfFileName);
 
-      // Create PDF document
-      const doc = new PDFDocument({
-        size: 'A4',
-        margin: 50
-      });
-
-      // Pipe to file
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
       const stream = fs.createWriteStream(pdfPath);
       doc.pipe(stream);
 
-      // ==================== HEADER ====================
-      doc.fontSize(28).font('Helvetica-Bold').fillColor('#007bff');
-      doc.text('InvoiceHub', 50, 50);
-      doc.fontSize(10).font('Helvetica').fillColor('#666');
-      doc.text('Your Professional Invoice Management Partner', 50, 82);
+      // --- Colors & Styling ---
+      const primaryColor = '#1e293b'; // Dark Slate
+      const secondaryColor = '#3b82f6'; // Professional Blue
+      const accentColor = '#64748b'; // Muted Grey
+      const tableHeaderBg = '#f8fafc';
 
-      // Horizontal line
-      doc.moveTo(50, 100).lineTo(550, 100).stroke('#e0e0e0');
-
-      // ==================== COMPANY INFO ====================
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#333');
-      doc.text('FROM:', 50, 120);
+      // ==================== HEADER SECTION ====================
+      // Logo/Brand Name
+      doc.fontSize(24).font('Helvetica-Bold').fillColor(primaryColor).text(user.businessName?.toUpperCase() || 'INVOICEHUB', 50, 45);
       
-      doc.fontSize(10).font('Helvetica').fillColor('#333');
-      doc.text(user.businessName || 'InvoiceHub', 50, 140);
-      doc.text(`${user.firstName} ${user.lastName}`, 50, 158);
+      // Invoice Label
+      doc.fontSize(20).font('Helvetica-Bold').fillColor(secondaryColor).text('INVOICE', 400, 45, { align: 'right' });
       
-      if (user.address) {
-        if (user.address.street) doc.text(`${user.address.street}`, 50, 176);
-        if (user.address.city) doc.text(`${user.address.city}, ${user.address.state} ${user.address.zipCode}`, 50, 194);
-      }
-      
-      doc.text(`Email: ${user.email}`, 50, 212);
-      doc.text(`Phone: ${user.phone}`, 50, 230);
-
-      // ==================== CLIENT INFO ====================
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#333');
-      doc.text('BILL TO:', 320, 120);
-      
-      doc.fontSize(10).font('Helvetica').fillColor('#333');
-      doc.text(`${client.firstName} ${client.lastName}`, 320, 140);
-      if (client.companyName) doc.text(client.companyName, 320, 158);
-      
-      if (client.address) {
-        if (client.address.street) doc.text(`${client.address.street}`, 320, 176);
-        if (client.address.city) doc.text(`${client.address.city}, ${client.address.state} ${client.address.zipCode}`, 320, 194);
-      }
-      
-      doc.text(`Email: ${client.email}`, 320, 212);
-      doc.text(`Phone: ${client.phone}`, 320, 230);
-
-      // ==================== INVOICE DETAILS ====================
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#333');
-      doc.text('INVOICE DETAILS', 50, 270);
-
-      const detailsY = 290;
-      doc.fontSize(9).font('Helvetica').fillColor('#666');
-      doc.text(`Invoice Number: ${invoice.invoiceNumber}`, 50, detailsY);
-      doc.text(`Invoice Date: ${formatDate(invoice.invoiceDate)}`, 50, detailsY + 18);
-      doc.text(`Due Date: ${formatDate(invoice.dueDate)}`, 50, detailsY + 36);
-      doc.text(`Payment Terms: ${invoice.paymentTerms}`, 50, detailsY + 54);
-
+      // Status Badge (Paid)
       if (invoice.status === 'paid') {
-        doc.fillColor('#28a745');
-        doc.text(`Status: PAID`, 50, detailsY + 72);
-        if (payment && payment.paymentDate) {
-          doc.fillColor('#666');
-          doc.text(`Payment Date: ${formatDate(payment.paymentDate)}`, 50, detailsY + 90);
-        }
+        doc.rect(480, 75, 65, 18).fill('#dcfce7');
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#166534').text('PAID', 480, 80, { width: 65, align: 'center' });
       }
+
+      // Metadata (Invoice #, Dates)
+      doc.moveTo(50, 110).lineTo(550, 110).stroke('#e2e8f0');
+      
+      let metaY = 125;
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(accentColor).text('INVOICE NUMBER', 50, metaY);
+      doc.fontSize(9).font('Helvetica-Bold').text('DATE OF ISSUE', 180, metaY);
+      doc.fontSize(9).font('Helvetica-Bold').text('DUE DATE', 310, metaY);
+
+      doc.fontSize(10).font('Helvetica').fillColor(primaryColor).text(invoice.invoiceNumber, 50, metaY + 15);
+      doc.text(formatDate(invoice.invoiceDate), 180, metaY + 15);
+      doc.text(formatDate(invoice.dueDate), 310, metaY + 15);
+
+      // ==================== BILLING DETAILS ====================
+      let billingY = 180;
+      // Company (From)
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(accentColor).text('FROM', 50, billingY);
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(primaryColor).text(user.businessName || 'InvoiceHub', 50, billingY + 15);
+      doc.fontSize(10).font('Helvetica').fillColor(primaryColor)
+         .text(`${user.firstName} ${user.lastName}`, 50, billingY + 30)
+         .text(user.email, 50, billingY + 45)
+         .text(user.phone || '', 50, billingY + 60);
+
+      // Client (To)
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(accentColor).text('BILL TO', 320, billingY);
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(primaryColor).text(`${client.firstName} ${client.lastName}`, 320, billingY + 15);
+      doc.fontSize(10).font('Helvetica').fillColor(primaryColor);
+      if (client.companyName) doc.text(client.companyName, 320, billingY + 30);
+      doc.text(client.email, 320, billingY + 45)
+         .text(client.phone || '', 320, billingY + 60);
 
       // ==================== LINE ITEMS TABLE ====================
-      const tableTop = 450;
-      const col1 = 50;
-      const col2 = 280;
-      const col3 = 400;
-      const col4 = 480;
+      const tableTop = 280;
+      doc.rect(50, tableTop, 500, 25).fill(tableHeaderBg);
+      
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(accentColor);
+      doc.text('DESCRIPTION', 60, tableTop + 8);
+      doc.text('QTY', 300, tableTop + 8);
+      doc.text('PRICE', 380, tableTop + 8);
+      doc.text('TOTAL', 480, tableTop + 8, { align: 'right' });
 
-      // Header
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#fff');
-      doc.rect(col1, tableTop, 500, 30).fill('#007bff');
-      doc.text('Description', col1 + 10, tableTop + 8);
-      doc.text('Qty', col2 + 10, tableTop + 8);
-      doc.text('Rate', col3 + 10, tableTop + 8);
-      doc.text('Amount', col4 + 10, tableTop + 8);
-
-      // Rows
       let rowY = tableTop + 35;
-      doc.fontSize(9).font('Helvetica').fillColor('#333');
+      doc.font('Helvetica').fontSize(10).fillColor(primaryColor);
 
       invoice.items.forEach((item) => {
-        doc.text(item.description.substring(0, 30), col1 + 10, rowY);
-        doc.text(item.quantity.toString(), col2 + 10, rowY);
-        doc.text(`$${item.rate.toFixed(2)}`, col3 + 10, rowY);
-        doc.text(`$${item.amount.toFixed(2)}`, col4 + 10, rowY);
+        // Subtle line separator
+        doc.moveTo(50, rowY + 15).lineTo(550, rowY + 15).lineWidth(0.5).stroke('#f1f5f9');
+        
+        doc.text(item.description, 60, rowY);
+        doc.text(item.quantity.toString(), 300, rowY);
+        doc.text(`$${item.rate.toFixed(2)}`, 380, rowY);
+        doc.text(`$${item.amount.toFixed(2)}`, 480, rowY, { align: 'right' });
         rowY += 25;
       });
 
-      // Summary Section
-      const summaryY = rowY + 20;
-      doc.fontSize(10).font('Helvetica').fillColor('#333');
+      // ==================== SUMMARY SECTION ====================
+      let summaryY = rowY + 20;
+      const summaryLeft = 350;
 
-      // Subtotal
-      doc.text('Subtotal:', 350, summaryY);
-      doc.text(`$${invoice.subtotal.toFixed(2)}`, 450, summaryY, { align: 'right' });
+      doc.fontSize(10).font('Helvetica').fillColor(accentColor).text('Subtotal', summaryLeft, summaryY);
+      doc.fillColor(primaryColor).text(`$${invoice.subtotal.toFixed(2)}`, 450, summaryY, { align: 'right' });
 
-      // Discount
-      if (invoice.discount > 0) {
-        doc.text('Discount:', 350, summaryY + 20);
-        doc.text(`-$${invoice.discount.toFixed(2)}`, 450, summaryY + 20, { align: 'right' });
-      }
+      doc.fillColor(accentColor).text(`Tax (${invoice.taxRate}%)`, summaryLeft, summaryY + 20);
+      doc.fillColor(primaryColor).text(`$${invoice.tax.toFixed(2)}`, 450, summaryY + 20, { align: 'right' });
 
-      // Tax
-      doc.fontSize(10).font('Helvetica').fillColor('#333');
-      doc.text(`Tax (${invoice.taxRate}%):`, 350, summaryY + 40);
-      doc.text(`$${invoice.tax.toFixed(2)}`, 450, summaryY + 40, { align: 'right' });
+      // Total Box
+      doc.rect(summaryLeft - 10, summaryY + 45, 210, 40).fill(secondaryColor);
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#ffffff').text('TOTAL AMOUNT', summaryLeft, summaryY + 58);
+      doc.text(`$${invoice.total.toFixed(2)}`, 450, summaryY + 58, { align: 'right' });
 
-      // Total
-      doc.fontSize(12).font('Helvetica-Bold').fillColor('#007bff');
-      doc.text('TOTAL:', 350, summaryY + 65);
-      doc.text(`$${invoice.total.toFixed(2)}`, 450, summaryY + 65, { align: 'right' });
-
-      // ==================== PAYMENT INFO ====================
-      if (payment) {
-        const paymentY = summaryY + 110;
-        doc.fontSize(11).font('Helvetica-Bold').fillColor('#333');
-        doc.text('PAYMENT INFORMATION', 50, paymentY);
-
-        doc.fontSize(9).font('Helvetica').fillColor('#666');
-        doc.text(`Payment Method: ${formatPaymentMethod(payment.paymentMethod)}`, 50, paymentY + 20);
-        doc.text(`Amount Paid: $${payment.amount.toFixed(2)}`, 50, paymentY + 38);
-        doc.text(`Payment Date: ${formatDate(payment.paymentDate)}`, 50, paymentY + 56);
-
-        if (payment.transactionId) {
-          doc.text(`Transaction ID: ${payment.transactionId}`, 50, paymentY + 74);
-        }
-        if (payment.referenceNumber) {
-          doc.text(`Reference: ${payment.referenceNumber}`, 50, paymentY + 92);
-        }
-      }
-
-      // ==================== NOTES ====================
+      // ==================== NOTES & FOOTER ====================
       if (invoice.notes) {
-        const notesY = 650;
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#333');
-        doc.text('Notes:', 50, notesY);
-        doc.fontSize(9).font('Helvetica').fillColor('#666');
-        doc.text(invoice.notes, 50, notesY + 20, {
-          width: 500,
-          align: 'left'
-        });
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(accentColor).text('NOTES', 50, 650);
+        doc.fontSize(9).font('Helvetica').fillColor(primaryColor).text(invoice.notes, 50, 665, { width: 250 });
       }
 
-      // ==================== FOOTER ====================
-      doc.fontSize(8).font('Helvetica').fillColor('#999');
-      doc.text('Thank you for your business!', 50, 750, { align: 'center' });
-      doc.text('InvoiceHub - Professional Invoice Management | www.invoicehub.com | support@invoicehub.com', 50, 765, { align: 'center' });
+      doc.fontSize(8).font('Helvetica').fillColor(accentColor).text('If you have any questions, please contact us.', 50, 750, { align: 'center' });
+      doc.fontSize(8).font('Helvetica-Bold').fillColor(primaryColor).text(user.businessName || 'InvoiceHub', 50, 765, { align: 'center' });
 
-      // Finish PDF
       doc.end();
 
-      // Resolve when file is written
-      stream.on('finish', () => {
-        console.log(`✅ PDF generated: ${pdfFileName}`);
-        resolve(pdfPath);
-      });
-
-      stream.on('error', (err) => {
-        reject(new Error(`Failed to write PDF: ${err.message}`));
-      });
+      stream.on('finish', () => resolve(pdfPath));
+      stream.on('error', (err) => reject(new Error(`Failed to write PDF: ${err.message}`)));
 
     } catch (error) {
       reject(new Error(`PDF generation error: ${error.message}`));
@@ -205,37 +132,15 @@ export const generateInvoicePDF = (invoice, client, user, payment) => {
   });
 };
 
-/**
- * Format date to readable string
- */
 function formatDate(date) {
   if (!date) return 'N/A';
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  return new Date(date).toLocaleDateString('en-US', options);
+  return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/**
- * Format payment method for display
- */
-function formatPaymentMethod(method) {
-  const methods = {
-    'bank_transfer': 'Bank Transfer',
-    'cheque': 'Cheque',
-    'upi': 'UPI',
-    'card': 'Credit/Debit Card',
-    'cash': 'Cash'
-  };
-  return methods[method] || method;
-}
-
-/**
- * Delete PDF file
- */
 export const deletePDF = (filePath) => {
   try {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      console.log(`✅ PDF deleted: ${filePath}`);
       return true;
     }
   } catch (error) {

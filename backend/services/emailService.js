@@ -1,4 +1,5 @@
 import axios from 'axios';
+import fs from 'fs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -10,6 +11,18 @@ export async function sendEmail(to, subject, htmlBody, attachments = []) {
         throw new Error('EMAIL_PASSWORD (API Key) not found in .env');
     }
 
+    // Convert local paths to Base64 objects for Brevo
+    const formattedAttachments = attachments.map(file => {
+        if (file.path && fs.existsSync(file.path)) {
+            const content = fs.readFileSync(file.path).toString('base64');
+            return {
+                content: content,
+                name: file.filename
+            };
+        }
+        return null;
+    }).filter(Boolean);
+
     const payload = {
         sender: {
             name: process.env.BUSINESS_NAME || 'InvoiceHub',
@@ -18,7 +31,8 @@ export async function sendEmail(to, subject, htmlBody, attachments = []) {
         to: [{ email: to }],
         subject: subject,
         htmlContent: htmlBody,
-        attachments: attachments
+        // Brevo uses 'attachment' (singular) for the array of objects
+        attachment: formattedAttachments 
     };
 
     try {
@@ -33,11 +47,12 @@ export async function sendEmail(to, subject, htmlBody, attachments = []) {
             }
         );
 
-        console.log(`✅ Email sent to ${to}`);
+        console.log(`✅ Email sent to ${to} with ${formattedAttachments.length} attachment(s)`);
         return { success: true, messageId: response.data.messageId };
     } catch (error) {
-        console.error(`❌ Failed to send email:`, error.response?.data?.message || error.message);
-        throw new Error(`Failed to send email: ${error.response?.data?.message || error.message}`);
+        const errorMsg = error.response?.data?.message || error.message;
+        console.error(`❌ Email Service Error:`, errorMsg);
+        throw new Error(`Failed to send email: ${errorMsg}`);
     }
 }
 

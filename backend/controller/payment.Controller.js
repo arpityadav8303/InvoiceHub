@@ -1,8 +1,14 @@
 import Payment from '../models/payment.model.js'
 import Invoice from '../models/invoice.model.js'
 import Client from '../models/client.model.js'
+import User from '../models/user.model.js'
+import { generateInvoicePDF, deletePDF } from '../services/pdfService.js'
+import { generatePaymentConfirmationEmailSmart } from '../services/llmService.js'
+import { sendEmail } from '../services/emailService.js'
 
 const recordPayment = async (req, res) => {
+  let pdfPath = null;
+  
   try {
     const { invoiceId, amount, paymentMethod, paymentDate = new Date(), referenceNumber, bankDetails, transactionId, notes } = req.body
 
@@ -47,6 +53,16 @@ const recordPayment = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Client not found'
+      })
+    }
+
+    // Step 5.5: Get user (business) details - ADDED FOR EMAIL/PDF
+    const user = await User.findById(invoice.userId)
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       })
     }
 
@@ -112,6 +128,59 @@ const recordPayment = async (req, res) => {
       }
     )
 
+    // ========== STEP 11.5: SEND PAYMENT CONFIRMATION EMAIL WITH PDF ==========
+    try {
+      console.log('📧 Generating payment confirmation email and PDF...')
+
+      // Generate PDF invoice with payment details
+      pdfPath = await generateInvoicePDF(invoice, client, user, newPayment)
+      console.log(`✅ PDF generated: ${pdfPath}`)
+
+      // Generate payment confirmation email using AI
+      const emailContent = await generatePaymentConfirmationEmailSmart(
+        newPayment,
+        invoice,
+        client,
+        user
+      )
+      console.log(`✅ Email content generated`)
+
+      // Send email with PDF attachment
+      const emailAttachments = [
+        {
+          filename: `Invoice_${invoice.invoiceNumber}.pdf`,
+          path: pdfPath
+        }
+      ]
+
+      const emailResult = await sendEmail(
+        client.email,
+        emailContent.subject,
+        emailContent.body_html,
+        emailAttachments
+      )
+
+      console.log(`✅ Payment confirmation email sent to ${client.email}`)
+      console.log(`   Message ID: ${emailResult.messageId}`)
+
+    } catch (emailError) {
+      // Don't fail the payment recording if email fails
+      console.error(
+        `⚠️  Failed to send payment confirmation email: ${emailError.message}`
+      )
+      // Continue with payment response anyway
+    } finally {
+      // Cleanup PDF file after sending
+      if (pdfPath) {
+        try {
+          await deletePDF(pdfPath)
+          console.log(`✅ Temporary PDF cleaned up`)
+        } catch (cleanupError) {
+          console.error(`⚠️  Failed to cleanup PDF: ${cleanupError.message}`)
+        }
+      }
+    }
+
     // Step 12: Return success response
     res.status(201).json({
       success: true,
@@ -139,10 +208,26 @@ const recordPayment = async (req, res) => {
         paymentReliabilityScore: newReliabilityScore,
         onTimePayments: isOnTime ? updatedClient.paymentStats.onTimePayments + 1 : updatedClient.paymentStats.onTimePayments,
         latePayments: isOnTime ? updatedClient.paymentStats.latePayments : updatedClient.paymentStats.latePayments + 1
+      },
+      email: {
+        sent: true,
+        to: client.email,
+        note: 'Payment confirmation email with invoice PDF has been sent to the client'
       }
     })
+
   } catch (error) {
     console.error('Record payment error:', error)
+    
+    // Cleanup PDF if error occurs
+    if (pdfPath) {
+      try {
+        await deletePDF(pdfPath)
+      } catch (cleanupError) {
+        console.error(`Failed to cleanup PDF on error: ${cleanupError.message}`)
+      }
+    }
+
     res.status(500).json({
       success: false,
       message: 'Error recording payment',
@@ -150,6 +235,7 @@ const recordPayment = async (req, res) => {
     })
   }
 }
+
 
 const getPayments = async (req, res) => {
   try {
@@ -195,38 +281,37 @@ const getPayments = async (req, res) => {
   }
 };
 
-const getPaymentsById= async (req,res)=>{
+const getPaymentsById = async (req, res) => {
   try {
-    const {id}=req.params;
-    const payment=await Payment.findById(id);
-    if(!payment){
+    const { id } = req.params;
+    const payment = await Payment.findById(id);
+    
+    if (!payment) {
       return res.status(404).json({
-        success:false,
-        message:'Payment not found'
+        success: false,
+        message: 'Payment not found'
       })
     }
     
-    if(payment.userId.toString()!==req.user._id.toString()){
+    if (payment.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({
-        success:false,
-        message:'Not authorized to access this payment'
+        success: false,
+        message: 'Not authorized to access this payment'
       })
     }
     
     return res.status(200).json({
-      success:true,
-      message:'Payment fetched successfully',
-      payment:payment
+      success: true,
+      message: 'Payment fetched successfully',
+      payment: payment
     })
-
 
   } catch (error) {
-     return res.status(500).json({
-      success:false,
-      message:'Error fetching payment',
-      error:error.message
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching payment',
+      error: error.message
     })
-
   }
 }
 
@@ -351,7 +436,4 @@ const deletePayment = async (req, res) => {
   }
 }
 
-
-
-
-export { recordPayment,getPayments,getPaymentsById,deletePayment }
+export { recordPayment, getPayments, getPaymentsById, deletePayment }

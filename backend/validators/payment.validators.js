@@ -24,26 +24,13 @@ const messages = {
     'date.max': 'Payment date cannot be in the future'
   },
 
-  referenceNumber: {
-    'string.base': 'Reference number must be a string'
-  },
-
   ifscCode: {
     'string.pattern.base': 'IFSC code must be in valid format (e.g., HDFC0000001)'
   },
 
-  transactionId: {
-    'string.base': 'Transaction ID must be a string'
-  },
-
-  notes: {
-    'string.base': 'Notes must be a string'
-  },
-
   status: {
-    'any.only': 'Status must be one of: draft, sent, paid, partially_paid, overdue, completed, pending, failed'
-  },
-
+    'any.only': 'Status must be one of: completed, pending, failed'
+  }
 }
 
 const fields = {
@@ -64,7 +51,7 @@ const fields = {
   referenceNumber: () =>
     Joi.string()
       .trim()
-      .messages(messages.referenceNumber),
+      .allow('', null),
 
   bankDetails: () =>
     Joi.object({
@@ -80,18 +67,17 @@ const fields = {
   transactionId: () =>
     Joi.string()
       .trim()
-      .messages(messages.transactionId),
+      .allow('', null),
 
   notes: () =>
     Joi.string()
       .trim()
-      .messages(messages.notes),
+      .allow('', null),
 
   status: () =>
     Joi.string()
-      .valid('draft', 'sent', 'paid', 'partially_paid', 'overdue', 'completed', 'pending', 'failed')
-      .messages(messages.status),
-
+      .valid('completed', 'pending', 'failed')
+      .messages(messages.status)
 }
 
 const paymentCreateSchema = Joi.object({
@@ -102,21 +88,12 @@ const paymentCreateSchema = Joi.object({
   referenceNumber: fields.referenceNumber().optional(),
   bankDetails: fields.bankDetails(),
   transactionId: fields.transactionId().optional(),
-  notes: fields.notes().optional(),
-  paymentHistory: fields.paymentHistory().optional()
+  notes: fields.notes().optional()
 })
 
 const paymentUpdateSchema = Joi.object({
-  invoiceId: fields.invoiceId().optional(),
-  amount: fields.amount().optional(),
-  paymentMethod: fields.paymentMethod().optional(),
-  paymentDate: fields.paymentDate().optional(),
-  referenceNumber: fields.referenceNumber().optional(),
-  bankDetails: fields.bankDetails(),
-  transactionId: fields.transactionId().optional(),
-  notes: fields.notes().optional(),
   status: fields.status().optional(),
-  paymentHistory: fields.paymentHistory().optional()
+  notes: fields.notes().optional()
 })
 
 export { paymentCreateSchema, paymentUpdateSchema }

@@ -8,158 +8,58 @@ import { sendEmail } from '../services/emailService.js'
 
 const recordPayment = async (req, res) => {
   let pdfPath = null;
-  
   try {
-    const { invoiceId, amount, paymentMethod,paymentDate = new Date(), referenceNumber, bankDetails, transactionId, notes } = req.body
+    const { invoiceId, amount, paymentMethod, paymentDate = new Date(), referenceNumber, bankDetails, transactionId, notes } = req.body;
 
-    // Step 1: Validate invoice exists
-    const invoice = await Invoice.findOne({_id:invoiceId,userId:req.user._id})
+    const invoice = await Invoice.findOne({ _id: invoiceId, userId: req.user._id });
+    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
 
-    if (!invoice) {
-      return res.status(404).json({
-        success: false,
-        message: 'Invoice not found'
-      })
+    if (invoice.status === 'paid') return res.status(400).json({ success: false, message: 'Invoice already fully paid' });
+
+    const remainingToPay = invoice.total - invoice.paidAmount;
+    if (amount > (remainingToPay + 0.01)) { // Added small buffer for float precision
+      return res.status(400).json({ success: false, message: `Amount exceeds balance of $${remainingToPay.toFixed(2)}` });
     }
 
-    // Step 2: Verify invoice belongs to logged-in user
+    const client = await Client.findById(invoice.clientId);
+    const user = await User.findById(invoice.userId);
 
-    // Step 3: Check if invoice is already paid
-    if (invoice.status === 'paid') {
-      return res.status(400).json({
-        success: false,
-        message: 'This invoice is already paid'
-      })
-    }
-
-    const remainingAmount = invoice.total - (invoice.paidAmount || 0);
-
-
-    // Step 4: Validate payment amount doesn't exceed invoice total
-    if (amount > invoice.total) {
-      return res.status(400).json({
-        success: false,
-        message: `Payment amount cannot exceed invoice total of ${invoice.total}`
-      })
-    }
-
-    if (amount > remainingAmount) {
-      return res.status(400).json({
-        success: false,
-        message: `Payment amount cannot exceed remaining balance of $${remainingAmount.toFixed(2)}`
-      })
-    }
-
-    if (amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Payment amount must be greater than 0'
-      })
-    }
-
-
-    // Step 5: Get client details
-    const client = await Client.findById(invoice.clientId)
-
-    if (!client) {
-      return res.status(404).json({
-        success: false,
-        message: 'Client not found'
-      })
-    }
-
-    // Step 5.5: Get user (business) details - ADDED FOR EMAIL/PDF
-    const user = await User.findById(invoice.userId)
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      })
-    }
-
-    // Step 6: Check if payment is on-time or late
-    const paymentDateObj = new Date(paymentDate)
-    const dueDateObj = new Date(invoice.dueDate)
-    const isOnTime = paymentDateObj <= dueDateObj
-    const daysOverdue = isOnTime ? 0 : Math.ceil((paymentDateObj - dueDateObj) / (1000 * 60 * 60 * 24))
-
-    // Step 7: Create payment record
+    // Create Payment Record
     const newPayment = await Payment.create({
       userId: req.user._id,
-      invoiceId: invoiceId,
-      clientId: invoice.clientId,
-      amount: amount,
-      paymentMethod: paymentMethod,
-      paymentDate: paymentDateObj,
-      referenceNumber: referenceNumber,
-      bankDetails: bankDetails,
-      transactionId: transactionId,
-      notes: notes,
-      status: 'completed'
-    })
-
-    const newPaidAmount = (invoice.paidAmount || 0) + amount;
-    const newRemainingAmount = invoice.total - newPaidAmount;
-
-    let newStatus = 'sent';
-    if (newPaidAmount >= invoice.total) {
-      newStatus = 'paid';
-    } else if (newPaidAmount > 0) {
-      newStatus = 'partially_paid';
-    }
-
-    // Step 8: Update invoice status to "paid"
-    await Invoice.findByIdAndUpdate(
       invoiceId,
-      {
-        status: newStatus,  // ← Correct status based on amount
-        paidAmount: newPaidAmount,
-        remainingAmount: newRemainingAmount,
-        paidAt: newPaidAmount >= invoice.total ? paymentDateObj : invoice.paidAt,
-        paymentMethod: paymentMethod,
-        $push: {  // Add to payment history
-          paymentHistory: {
-            amount: amount,
-            paymentDate: paymentDateObj,
-            paymentMethod: paymentMethod,
-            transactionId: transactionId,
-            referenceNumber: referenceNumber
-          }
-        }
-      }
-    )
+      clientId: invoice.clientId,
+      amount,
+      paymentMethod,
+      paymentDate,
+      referenceNumber,
+      bankDetails,
+      transactionId,
+      notes
+    });
 
-    // Step 9: Update client payment stats
-    const updateData = {
+    // Update Invoice
+    invoice.paidAmount += amount;
+    invoice.calculateStatus(); // Uses the logic: partially_paid vs paid
+    invoice.paymentHistory.push({
+      amount,
+      paymentDate,
+      paymentMethod,
+      transactionId,
+      referenceNumber
+    });
+    await invoice.save();
+
+    // Update Client Stats
+    const isLate = new Date(paymentDate) > new Date(invoice.dueDate);
+    await Client.findByIdAndUpdate(invoice.clientId, {
       $inc: {
         'paymentStats.totalPaid': amount,
-        'paymentStats.totalUnpaid': -amount
-      }
-    }
-
-    // If payment is on-time, increment onTimePayments, otherwise increment latePayments
-    if (isOnTime) {
-      updateData.$inc['paymentStats.onTimePayments'] = 1
-    } else {
-      updateData.$inc['paymentStats.latePayments'] = 1
-    }
-
-    // Step 10: Update client's last payment date
-    updateData['paymentStats.lastPaymentDate'] = paymentDateObj
-
-    await Client.findByIdAndUpdate(invoice.clientId, updateData)
-
-    // Step 11: Recalculate client's payment reliability score
-    const updatedClient = await Client.findById(invoice.clientId)
-    const newReliabilityScore = updatedClient.calculateReliabilityScore()
-
-    await Client.findByIdAndUpdate(
-      invoice.clientId,
-      {
-        'paymentStats.paymentReliabilityScore': newReliabilityScore
-      }
-    )
+        'paymentStats.totalUnpaid': -amount,
+        [isLate ? 'paymentStats.latePayments' : 'paymentStats.onTimePayments']: 1
+      },
+      $set: { 'paymentStats.lastPaymentDate': paymentDate }
+    });
 
     // ========== STEP 11.5: SEND PAYMENT CONFIRMATION EMAIL WITH PDF ==========
     try {

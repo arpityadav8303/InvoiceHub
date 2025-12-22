@@ -79,9 +79,31 @@ const invoiceSchema = new mongoose.Schema(
     
     status: {
       type: String,
-      enum: ['draft', 'sent', 'paid', 'overdue'],
+      enum: ['draft', 'sent', 'paid', 'partially_paid', 'overdue'],
       default: 'draft'
     },
+
+    paidAmount: {  // ← Track how much is paid
+      type: Number,
+      default: 0
+    },
+    
+    remainingAmount: {  // ← Track remaining balance
+      type: Number,
+      default: 0
+    },
+    
+    paidAt: Date,
+    paymentMethod: String,
+    paymentHistory: [  // ← Track all payments
+      {
+        amount: Number,
+        paymentDate: Date,
+        paymentMethod: String,
+        transactionId: String,
+        referenceNumber: String
+      }
+    ],
     
     paymentTerms: {
       type: String,
@@ -136,6 +158,18 @@ invoiceSchema.methods.getDaysOverdue = function() {
   const diffTime = now - dueDate
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   return diffDays > 0 ? diffDays : 0
+}
+
+invoiceSchema.methods.calculateStatus = function() {
+  if (this.paidAmount === 0) {
+    this.status = 'sent';
+  } else if (this.paidAmount < this.total) {
+    this.status = 'partially_paid';
+  } else if (this.paidAmount >= this.total) {
+    this.status = 'paid';
+  }
+  this.remainingAmount = this.total - this.paidAmount;
+  return this.status;
 }
 
 const Invoice = mongoose.model('Invoice', invoiceSchema)

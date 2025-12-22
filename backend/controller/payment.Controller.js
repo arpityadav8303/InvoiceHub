@@ -10,10 +10,10 @@ const recordPayment = async (req, res) => {
   let pdfPath = null;
   
   try {
-    const { invoiceId, amount, paymentMethod, paymentDate = new Date(), referenceNumber, bankDetails, transactionId, notes } = req.body
+    const { invoiceId, amount, paymentMethod,paymentDate = new Date(), referenceNumber, bankDetails, transactionId, notes } = req.body
 
     // Step 1: Validate invoice exists
-    const invoice = await Invoice.findById(invoiceId)
+    const invoice = await Invoice.findOne({_id:invoiceId,userId:req.user._id})
 
     if (!invoice) {
       return res.status(404).json({
@@ -23,12 +23,6 @@ const recordPayment = async (req, res) => {
     }
 
     // Step 2: Verify invoice belongs to logged-in user
-    if (invoice.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to record payment for this invoice'
-      })
-    }
 
     // Step 3: Check if invoice is already paid
     if (invoice.status === 'paid') {
@@ -38,6 +32,9 @@ const recordPayment = async (req, res) => {
       })
     }
 
+    const remainingAmount = invoice.total - (invoice.paidAmount || 0);
+
+
     // Step 4: Validate payment amount doesn't exceed invoice total
     if (amount > invoice.total) {
       return res.status(400).json({
@@ -45,6 +42,21 @@ const recordPayment = async (req, res) => {
         message: `Payment amount cannot exceed invoice total of ${invoice.total}`
       })
     }
+
+    if (amount > remainingAmount) {
+      return res.status(400).json({
+        success: false,
+        message: `Payment amount cannot exceed remaining balance of $${remainingAmount.toFixed(2)}`
+      })
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment amount must be greater than 0'
+      })
+    }
+
 
     // Step 5: Get client details
     const client = await Client.findById(invoice.clientId)
@@ -87,13 +99,34 @@ const recordPayment = async (req, res) => {
       status: 'completed'
     })
 
+    const newPaidAmount = (invoice.paidAmount || 0) + amount;
+    const newRemainingAmount = invoice.total - newPaidAmount;
+
+    let newStatus = 'sent';
+    if (newPaidAmount >= invoice.total) {
+      newStatus = 'paid';
+    } else if (newPaidAmount > 0) {
+      newStatus = 'partially_paid';
+    }
+
     // Step 8: Update invoice status to "paid"
     await Invoice.findByIdAndUpdate(
       invoiceId,
       {
-        status: 'paid',
-        paidAt: paymentDateObj,
-        paymentMethod: paymentMethod
+        status: newStatus,  // ← Correct status based on amount
+        paidAmount: newPaidAmount,
+        remainingAmount: newRemainingAmount,
+        paidAt: newPaidAmount >= invoice.total ? paymentDateObj : invoice.paidAt,
+        paymentMethod: paymentMethod,
+        $push: {  // Add to payment history
+          paymentHistory: {
+            amount: amount,
+            paymentDate: paymentDateObj,
+            paymentMethod: paymentMethod,
+            transactionId: transactionId,
+            referenceNumber: referenceNumber
+          }
+        }
       }
     )
 

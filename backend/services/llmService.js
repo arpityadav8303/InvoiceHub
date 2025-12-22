@@ -482,7 +482,7 @@ export const generatePaymentConfirmationEmailSmart = async (payment, invoice, cl
     return generatePaymentConfirmationFallback(payment, invoice, client, user);
   }
 };
-
+ 
 /**
  * Fallback: Generate reminder template without AI
  */

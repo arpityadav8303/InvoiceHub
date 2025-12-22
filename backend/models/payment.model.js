@@ -53,7 +53,7 @@ const paymentSchema = new mongoose.Schema(
     
     status: {
       type: String,
-      enum: ['completed', 'pending', 'failed'],
+      enum: ['draft', 'sent', 'paid', 'partially_paid', 'overdue'],
       default: 'completed'
     },
     
@@ -81,6 +81,8 @@ paymentSchema.methods.getPaymentDetails = function() {
     status: this.status
   }
 }
+
+
 
 const Payment = mongoose.model('Payment', paymentSchema)
 

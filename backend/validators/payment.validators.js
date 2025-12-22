@@ -1,6 +1,5 @@
 import Joi from 'joi'
 
-
 const messages = {
   invoiceId: {
     'any.required': 'Invoice ID is required',
@@ -42,32 +41,32 @@ const messages = {
   },
 
   status: {
-    'any.only': 'Status must be one of: completed, pending, failed'
-  }
-}
+    'any.only': 'Status must be one of: draft, sent, paid, partially_paid, overdue, completed, pending, failed'
+  },
 
+}
 
 const fields = {
   invoiceId: () => Joi.string().hex().length(24).messages(messages.invoiceId),
 
   amount: () => Joi.number().positive().messages(messages.amount),
 
-  paymentMethod: () => 
+  paymentMethod: () =>
     Joi.string()
       .valid('bank_transfer', 'cheque', 'upi', 'card', 'cash')
       .messages(messages.paymentMethod),
 
-  paymentDate: () => 
+  paymentDate: () =>
     Joi.date()
       .max('now')
       .messages(messages.paymentDate),
 
-  referenceNumber: () => 
+  referenceNumber: () =>
     Joi.string()
       .trim()
       .messages(messages.referenceNumber),
 
-  bankDetails: () => 
+  bankDetails: () =>
     Joi.object({
       bankName: Joi.string().trim().optional(),
       accountNumber: Joi.string().trim().optional(),
@@ -78,64 +77,46 @@ const fields = {
         .messages(messages.ifscCode)
     }).optional(),
 
-  transactionId: () => 
+  transactionId: () =>
     Joi.string()
       .trim()
       .messages(messages.transactionId),
 
-  notes: () => 
+  notes: () =>
     Joi.string()
       .trim()
       .messages(messages.notes),
 
-  status: () => 
+  status: () =>
     Joi.string()
-      .valid('completed', 'pending', 'failed')
-      .messages(messages.status)
-}
+      .valid('draft', 'sent', 'paid', 'partially_paid', 'overdue', 'completed', 'pending', 'failed')
+      .messages(messages.status),
 
-// ============================================
-// CREATE PAYMENT SCHEMA
-// ============================================
+}
 
 const paymentCreateSchema = Joi.object({
   invoiceId: fields.invoiceId().required(),
-
   amount: fields.amount().required(),
-
   paymentMethod: fields.paymentMethod().required(),
-
   paymentDate: fields.paymentDate().required(),
-
   referenceNumber: fields.referenceNumber().optional(),
-
   bankDetails: fields.bankDetails(),
-
   transactionId: fields.transactionId().optional(),
-
-  notes: fields.notes().optional()
+  notes: fields.notes().optional(),
+  paymentHistory: fields.paymentHistory().optional()
 })
-
 
 const paymentUpdateSchema = Joi.object({
   invoiceId: fields.invoiceId().optional(),
-
   amount: fields.amount().optional(),
-
   paymentMethod: fields.paymentMethod().optional(),
-
   paymentDate: fields.paymentDate().optional(),
-
   referenceNumber: fields.referenceNumber().optional(),
-
   bankDetails: fields.bankDetails(),
-
   transactionId: fields.transactionId().optional(),
-
   notes: fields.notes().optional(),
-
-  status: fields.status().optional()
+  status: fields.status().optional(),
+  paymentHistory: fields.paymentHistory().optional()
 })
-
 
 export { paymentCreateSchema, paymentUpdateSchema }

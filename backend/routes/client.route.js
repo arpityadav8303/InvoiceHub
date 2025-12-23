@@ -15,8 +15,3 @@ router.delete('/:id', protect, deleteClient)
 export default router
 
 
-//"_id": "69366b5e553a489547707c38"
-//"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5MzY2YjVlNTUzYTQ4OTU0NzcwN2MzOCIsImlhdCI6MTc2NTE3NDExMCwiZXhwIjoxNzY1Nzc4OTEwfQ.P3OQBD-xptj_EhO9bmrXXnZwudb7iLweTezV9fmNKUI"
-
-
-//  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5MzkxYzI1YmVhYmU4YmM2ZTFjODgxZiIsImlhdCI6MTc2NTM1MDQ4MywiZXhwIjoxNzY1OTU1MjgzfQ.hHiQk1njSJQLmYOYsVgM61EGp9yfRzqGBErSh5IRwiY"

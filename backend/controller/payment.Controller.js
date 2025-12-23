@@ -9,102 +9,140 @@ import { sendEmail } from '../services/emailService.js'
 const recordPayment = async (req, res) => {
   let pdfPath = null;
   try {
-    const { invoiceId, amount, paymentMethod, paymentDate = new Date(), referenceNumber, bankDetails, transactionId, notes } = req.body;
+    const {
+      invoiceId,
+      amount,
+      paymentMethod,
+      paymentDate = new Date(),
+      referenceNumber,
+      bankDetails,
+      transactionId,
+      notes
+    } = req.body;
 
+    // Ensure paymentDate is a Date object
+    const paymentDateObj = new Date(paymentDate);
+
+    // Step 1: Find invoice
     const invoice = await Invoice.findOne({ _id: invoiceId, userId: req.user._id });
-    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
-
-    if (invoice.status === 'paid') return res.status(400).json({ success: false, message: 'Invoice already fully paid' });
-
-    const remainingToPay = invoice.total - invoice.paidAmount;
-    if (amount > (remainingToPay + 0.01)) { // Added small buffer for float precision
-      return res.status(400).json({ success: false, message: `Amount exceeds balance of $${remainingToPay.toFixed(2)}` });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
     }
 
+    if (invoice.status === 'paid') {
+      return res.status(400).json({ success: false, message: 'Invoice already fully paid' });
+    }
+
+    // Step 2: Validate amount
+    const remainingToPay = invoice.total - invoice.paidAmount;
+    if (amount > (remainingToPay + 0.01)) {
+      return res.status(400).json({
+        success: false,
+        message: `Amount exceeds balance of $${remainingToPay.toFixed(2)}`
+      });
+    }
+
+    // Step 3: Fetch client and user
     const client = await Client.findById(invoice.clientId);
     const user = await User.findById(invoice.userId);
 
-    // Create Payment Record
+    // Step 4: Create Payment Record
     const newPayment = await Payment.create({
       userId: req.user._id,
       invoiceId,
       clientId: invoice.clientId,
       amount,
       paymentMethod,
-      paymentDate,
+      paymentDate: paymentDateObj,
       referenceNumber,
       bankDetails,
       transactionId,
       notes
     });
 
-    // Update Invoice
+    // Step 5: Update Invoice
     invoice.paidAmount += amount;
-    invoice.calculateStatus(); // Uses the logic: partially_paid vs paid
+    invoice.calculateStatus(); // sets draft/sent/partially_paid/paid
     invoice.paymentHistory.push({
       amount,
-      paymentDate,
+      paymentDate: paymentDateObj,
       paymentMethod,
       transactionId,
       referenceNumber
     });
     await invoice.save();
 
-    // Update Client Stats
-    const isLate = new Date(paymentDate) > new Date(invoice.dueDate);
+    // Step 6: Update Client Stats
+    const isOnTime = paymentDateObj <= new Date(invoice.dueDate);
+    const daysOverdue = isOnTime
+      ? 0
+      : Math.ceil((paymentDateObj - new Date(invoice.dueDate)) / (1000 * 60 * 60 * 24));
+
     await Client.findByIdAndUpdate(invoice.clientId, {
       $inc: {
         'paymentStats.totalPaid': amount,
         'paymentStats.totalUnpaid': -amount,
-        [isLate ? 'paymentStats.latePayments' : 'paymentStats.onTimePayments']: 1
+        [isOnTime ? 'paymentStats.onTimePayments' : 'paymentStats.latePayments']: 1
       },
-      $set: { 'paymentStats.lastPaymentDate': paymentDate }
+      $set: { 'paymentStats.lastPaymentDate': paymentDateObj }
     });
 
-    // ========== STEP 11.5: SEND PAYMENT CONFIRMATION EMAIL WITH PDF ==========
+    const updatedClient = await Client.findById(invoice.clientId);
+
+    // Example reliability score calculation (adjust as needed)
+    const totalPayments =
+      updatedClient.paymentStats.onTimePayments + updatedClient.paymentStats.latePayments;
+    const newReliabilityScore =
+      totalPayments > 0
+        ? Math.round(
+            (updatedClient.paymentStats.onTimePayments / totalPayments) * 100
+          )
+        : 0;
+
+    // Step 7: Send Payment Confirmation Email with PDF
     try {
-  console.log('📧 Generating payment confirmation email and PDF...');
+      console.log('📧 Generating payment confirmation email and PDF...');
+      pdfPath = await generateInvoicePDF(invoice, client, user, newPayment);
+      console.log(`✅ PDF generated at: ${pdfPath}`);
 
-  // Ensure this returns a STRING path, not a Promise object
-  pdfPath = await generateInvoicePDF(invoice, client, user, newPayment);
-  console.log(`✅ PDF generated at: ${pdfPath}`);
+      const emailContent = await generatePaymentConfirmationEmailSmart(
+        newPayment,
+        invoice,
+        client,
+        user
+      );
 
-  const emailContent = await generatePaymentConfirmationEmailSmart(newPayment, invoice, client, user);
+      const emailAttachments = [
+        {
+          filename: `Invoice_${invoice.invoiceNumber}.pdf`,
+          path: pdfPath
+        }
+      ];
 
-  const emailAttachments = [
-    {
-      filename: `Invoice_${invoice.invoiceNumber}.pdf`,
-      path: pdfPath
-    }
-  ];
+      await sendEmail(
+        client.email,
+        emailContent.subject,
+        emailContent.body_html,
+        emailAttachments
+      );
 
-  // Await the email sending process
-  const emailResult = await sendEmail(
-    client.email,
-    emailContent.subject,
-    emailContent.body_html,
-    emailAttachments
-  );
-
-  console.log(`✅ Payment confirmation email sent to ${client.email}`);
-
-} catch (emailError) {
-  console.error(`⚠️ Failed to send payment confirmation email: ${emailError.message}`);
-} finally {
-  // CRITICAL FIX: Ensure the file is actually deleted
-  if (pdfPath) {
-    try {
-      // Use await to ensure the file system operation finishes
-      const deleted = await deletePDF(pdfPath); 
-      if (deleted) {
-        console.log(`✅ Temporary PDF successfully cleaned up: ${pdfPath}`);
+      console.log(`✅ Payment confirmation email sent to ${client.email}`);
+    } catch (emailError) {
+      console.error(`⚠️ Failed to send payment confirmation email: ${emailError.message}`);
+    } finally {
+      if (pdfPath) {
+        try {
+          const deleted = await deletePDF(pdfPath);
+          if (deleted) {
+            console.log(`✅ Temporary PDF successfully cleaned up: ${pdfPath}`);
+          }
+        } catch (cleanupError) {
+          console.error(`⚠️ Failed to cleanup PDF: ${cleanupError.message}`);
+        }
       }
-    } catch (cleanupError) {
-      console.error(`⚠️ Failed to cleanup PDF: ${cleanupError.message}`);
     }
-  }
-}
-    // Step 12: Return success response
+
+    // Step 8: Return success response
     res.status(201).json({
       success: true,
       message: 'Payment recorded successfully',
@@ -118,36 +156,34 @@ const recordPayment = async (req, res) => {
         referenceNumber: newPayment.referenceNumber,
         transactionId: newPayment.transactionId,
         status: newPayment.status,
-        isOnTime: isOnTime,
-        daysOverdue: daysOverdue
+        isOnTime,
+        daysOverdue
       },
       invoice: {
-        status: 'paid',
+        status: invoice.status,
         paidAt: paymentDateObj
       },
       clientStats: {
-        totalPaid: updatedClient.paymentStats.totalPaid + amount,
-        totalUnpaid: updatedClient.paymentStats.totalUnpaid - amount,
+        totalPaid: updatedClient.paymentStats.totalPaid,
+        totalUnpaid: updatedClient.paymentStats.totalUnpaid,
         paymentReliabilityScore: newReliabilityScore,
-        onTimePayments: isOnTime ? updatedClient.paymentStats.onTimePayments + 1 : updatedClient.paymentStats.onTimePayments,
-        latePayments: isOnTime ? updatedClient.paymentStats.latePayments : updatedClient.paymentStats.latePayments + 1
+        onTimePayments: updatedClient.paymentStats.onTimePayments,
+        latePayments: updatedClient.paymentStats.latePayments
       },
       email: {
         sent: true,
         to: client.email,
         note: 'Payment confirmation email with invoice PDF has been sent to the client'
       }
-    })
-
+    });
   } catch (error) {
-    console.error('Record payment error:', error)
-    
-    // Cleanup PDF if error occurs
+    console.error('Record payment error:', error);
+
     if (pdfPath) {
       try {
-        await deletePDF(pdfPath)
+        await deletePDF(pdfPath);
       } catch (cleanupError) {
-        console.error(`Failed to cleanup PDF on error: ${cleanupError.message}`)
+        console.error(`Failed to cleanup PDF on error: ${cleanupError.message}`);
       }
     }
 
@@ -155,10 +191,9 @@ const recordPayment = async (req, res) => {
       success: false,
       message: 'Error recording payment',
       error: error.message
-    })
+    });
   }
-}
-
+};
 
 const getPayments = async (req, res) => {
   try {

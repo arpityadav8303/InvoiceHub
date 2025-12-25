@@ -1,6 +1,6 @@
 import Invoice from '../models/invoice.model.js';
 import Client from '../models/client.model.js';
-import { sendEmail } from '../services/emailService.js';
+import { sendEmail, sendEmailReminder} from '../services/emailService.js';
 import { generateClientReminderSmart, generatePaymentConfirmationEmailSmart } from '../services/llmService.js';
 
 /**
@@ -44,7 +44,7 @@ export const sendPaymentReminder = async (req, res) => {
 
     // Send email
     console.log("📧 Sending reminder email...");
-    const emailResult = await sendEmail(
+    const emailResult = await sendEmailReminder(
       client.email,
       emailContent.subject,
       emailContent.body_html

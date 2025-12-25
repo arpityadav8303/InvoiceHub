@@ -56,6 +56,46 @@ export async function sendEmail(to, subject, htmlBody, attachments = []) {
     }
 }
 
+export async function sendEmailReminder(to,subject,htmlBody){
+    const apiKey = process.env.EMAIL_PASSWORD;
+    if(!apiKey){
+        throw new Error('EMAIL_PASSWORD (API Key) not found in .env');
+    }
+
+    const payLoad={
+        sender:{
+            name:process.env.BUSINESS_NAME || 'InvoiceHub',
+            email:process.env.EMAIL_SENDER
+        },
+        to:[{email:to}],
+        subject:subject,
+        htmlContent:htmlBody
+    };
+     try {
+        const response=await axios.post(
+           'https://api.brevo.com/v3/smtp/email',
+            payLoad,
+            {
+            headers: {
+                    'api-key': apiKey,
+                    'Content-Type': 'application/json'
+                }
+            }
+         )
+          console.log(`✅ Email reminder sent to ${to}`);
+        // ✅ RETURN the response with messageId
+        return { 
+            success: true, 
+            messageId: response.data.messageId,
+            sentAt: new Date()
+        };
+      } catch (error) {
+         const errorMsg = error.response?.data?.message || error.message;
+        console.error(`❌ Email Service Error:`, errorMsg);
+        throw new Error(`Failed to send email: ${errorMsg}`);
+      }
+}
+
 // import nodemailer from 'nodemailer';
 // import axios from 'axios';
 // import dotenv from 'dotenv';

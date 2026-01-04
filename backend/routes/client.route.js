@@ -1,15 +1,16 @@
 import express from 'express'
 import { createClient, getClients, getClientById, updateClient, deleteClient } from '../controller/client.controller.js'
 import { clientValidationSchema } from '../validators/client.validators.js'
-import { protect,validate } from '../middleware/auth.middleware.js'
+import { protect, validate } from '../middleware/auth.middleware.js'
+import rateLimiter from '../middleware/rate-limitor.js'
 
 const router = express.Router()
 
-router.post('/',protect,validate(clientValidationSchema),createClient)
-router.get('/', protect, getClients)
-router.get('/:id', protect, getClientById)
-router.put('/:id', protect, validate(clientValidationSchema), updateClient)
-router.delete('/:id', protect, deleteClient)
+router.post('/', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, validate(clientValidationSchema), createClient)
+router.get('/', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, getClients)
+router.get('/:id', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, getClientById)
+router.put('/:id', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, validate(clientValidationSchema), updateClient)
+router.delete('/:id', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, deleteClient)
 
 
 export default router

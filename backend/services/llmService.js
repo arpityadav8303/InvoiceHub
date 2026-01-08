@@ -540,3 +540,289 @@ export const generateContent = async (prompt) => {
     throw new Error(`Failed to generate content: ${error.message}`);
   }
 };
+
+export const generateClientWelcomeEmailByLLM = async (client, generatedPassword, businessOwner) => {
+  const prompt = `
+You are an expert email copywriter for InvoiceHub, a professional invoice management platform.
+Your task is to generate a warm, professional, and engaging welcome email for a newly created client account.
+
+**CRITICAL: Return ONLY valid JSON with exactly two keys: "subject" and "body_html". No additional text, no markdown, no code fences.**
+
+---
+
+### CLIENT & BUSINESS INFORMATION:
+- Client Name: ${client.firstName} ${client.lastName}
+- Client Email: ${client.email}
+- Client Phone: ${client.phone || 'Not provided'}
+- Business Name: ${businessOwner.businessName}
+- Business Email: ${businessOwner.email}
+
+### LOGIN CREDENTIALS (MUST BE INCLUDED IN EMAIL):
+- Email: ${client.email}
+- Password: ${generatedPassword}
+
+---
+
+### EMAIL REQUIREMENTS:
+
+#### SUBJECT LINE:
+Format: "Welcome to InvoiceHub – Your Account is Ready, [FirstName]!"
+Example: "Welcome to InvoiceHub – Your Account is Ready, John!"
+
+#### DESIGN & STRUCTURE:
+
+1. **Header Section:**
+   - Gradient background (blue to dark blue: #007bff to #0056b3)
+   - Large welcome heading with icon
+   - Professional greeting
+   - White text color
+
+2. **Greeting:**
+   - Personalized: "Hello [FirstName] [LastName],"
+   - Brief introduction about what they can do
+   - Mention that account was created by [BusinessName]
+   - Friendly and warm tone
+
+3. **Credentials Section (CRITICAL - MUST INCLUDE):**
+   - Display login email clearly: ${client.email}
+   - Display password clearly: ${generatedPassword}
+   - Use monospace font (Courier New) for credentials
+   - Light blue background (#f0f7ff)
+   - Left blue border (#007bff)
+   - Make credentials easily readable and copyable
+   - Format:
+     * Email: [monospace]${client.email}[/monospace]
+     * Password: [monospace]${generatedPassword}[/monospace]
+
+4. **Security Warning:**
+   - Warn about changing password after first login
+   - Never share credentials warning
+   - Use yellow/amber warning background (#fff3cd)
+   - Left border (#ffc107)
+   - Professional and clear tone
+
+5. **Call-to-Action Button:**
+   - "Login to Your Account" button
+   - Blue color (#007bff)
+   - Centered and prominent
+   - Make it look clickable (use button styling)
+
+6. **Features Section:**
+   - What they can do:
+     * View all invoices
+     * Download invoices as PDF
+     * Make secure online payments
+     * Track payment history
+     * Monitor invoice status
+     * Update their profile information
+   - Use checkmarks (✓) for each feature
+   - Easy to scan list
+
+7. **Getting Started Steps:**
+   - Step-by-step instructions:
+     1. Save your login credentials
+     2. Click the login button
+     3. Enter email and password
+     4. View your invoices
+     5. Make a payment when ready
+     6. Change your password for security
+   - Use numbered list
+
+8. **Support Section:**
+   - "Need Help?" message
+   - Mention they can contact ${businessOwner.businessName}
+   - Provide contact email: ${businessOwner.email}
+   - Professional and helpful tone
+   - Use green color (#28a745)
+
+9. **Footer:**
+   - Company name: InvoiceHub
+   - Copyright notice: "© 2024 InvoiceHub"
+   - Professional closing
+
+---
+
+### TECHNICAL REQUIREMENTS:
+
+- **HTML Structure:** Valid, semantic HTML5
+- **Styling:** Inline CSS only (no external stylesheets)
+- **Responsive:** Mobile-friendly design with appropriate padding/margins
+- **Colors:** 
+  - Primary Blue: #007bff
+  - Success Green: #28a745
+  - Warning Yellow: #ffc107
+  - Background Light: #f8f9fa
+  - Text Dark: #333333
+- **Fonts:** Arial, Helvetica, sans-serif (fallback)
+- **Monospace Font:** 'Courier New', monospace for credentials
+- **Max Width:** 600px
+- **Meta Tags:** Include charset UTF-8 and viewport
+
+---
+
+### CRITICAL INSTRUCTIONS:
+
+✅ MUST INCLUDE:
+1. Login Email: ${client.email}
+2. Login Password: ${generatedPassword}
+3. Client Name: ${client.firstName} ${client.lastName}
+4. Business Name: ${businessOwner.businessName}
+5. Business Email: ${businessOwner.email}
+
+✅ CREDENTIALS MUST BE:
+- Clearly visible
+- In monospace font
+- Easy to copy
+- In their own section with colored background
+
+✅ EMAIL DESIGN MUST BE:
+- Professional
+- Not cartoonish
+- Mobile-friendly
+- Properly formatted HTML
+- With inline CSS only
+
+---
+
+### OUTPUT FORMAT:
+
+Return ONLY this JSON (no other text):
+{
+  "subject": "Welcome to InvoiceHub – Your Account is Ready, ${client.firstName}!",
+  "body_html": "<html>...COMPLETE HTML EMAIL...</html>"
+}
+
+**Important:**
+- NO markdown code fences
+- NO backticks
+- NO additional text
+- ONLY valid JSON
+- Proper HTML structure
+- All special characters escaped
+- Valid JSON syntax
+
+Generate the welcome email now:
+`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text().trim();
+
+    // Remove markdown code fences if present
+    const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
+    
+    // Parse JSON
+    const emailContent = JSON.parse(cleanText);
+
+    // Validate response
+    if (!emailContent.subject || !emailContent.body_html) {
+      throw new Error("AI response missing required fields (subject or body_html)");
+    }
+
+    // Verify credentials are in the email
+    if (!emailContent.body_html.includes(client.email)) {
+      console.warn("⚠️ Warning: Email might not contain client email");
+    }
+    if (!emailContent.body_html.includes(generatedPassword)) {
+      console.warn("⚠️ Warning: Email might not contain password");
+    }
+
+    console.log(`✅ Welcome email generated by LLM for ${client.email}`);
+    return emailContent;
+
+  } catch (error) {
+    console.error("❌ LLM Error:", error.message);
+    throw new Error(`Failed to generate welcome email: ${error.message}`);
+  }
+};
+
+/**
+ * Fallback welcome email template (if LLM fails)
+ */
+export const generateClientWelcomeEmailFallback = (client, generatedPassword, businessOwner) => {
+  return {
+    subject: `Welcome to InvoiceHub – Your Account is Ready, ${client.firstName}!`,
+    body_html: `
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, Helvetica, sans-serif; color: #333; background-color: #f8f9fa; margin: 0; padding: 20px;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden;">
+            
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 40px 20px; text-align: center;">
+              <h1 style="margin: 0; font-size: 28px;">🎉 Welcome to InvoiceHub</h1>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">Your Account is Ready</p>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 30px 20px;">
+              <p style="font-size: 16px;">Hello <strong>${client.firstName} ${client.lastName}</strong>,</p>
+              
+              <p>Your account has been successfully created by <strong>${businessOwner.businessName}</strong>. You can now access your invoices and make payments online through our secure portal.</p>
+
+              <!-- Credentials -->
+              <div style="background-color: #f0f7ff; border-left: 4px solid #007bff; padding: 20px; margin: 20px 0; border-radius: 4px;">
+                <h3 style="margin-top: 0; color: #007bff;">📝 Your Login Credentials</h3>
+                <p style="font-size: 15px; margin: 10px 0;">
+                  <strong>Email:</strong><br>
+                  <span style="color: #007bff; font-family: 'Courier New', monospace; background-color: #e7f3ff; padding: 6px 10px; border-radius: 3px; display: inline-block;">${client.email}</span>
+                </p>
+                <p style="font-size: 15px; margin: 15px 0 0 0;">
+                  <strong>Password:</strong><br>
+                  <span style="color: #007bff; font-family: 'Courier New', monospace; background-color: #e7f3ff; padding: 6px 10px; border-radius: 3px; display: inline-block;">${generatedPassword}</span>
+                </p>
+              </div>
+
+              <!-- Warning -->
+              <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; border-radius: 4px; color: #856404; font-size: 14px;">
+                <strong>⚠️ Important Security Notice:</strong><br>
+                We recommend changing your password after your first login. Please do not share your credentials with anyone.
+              </div>
+
+              <!-- Features -->
+              <div style="background-color: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 4px;">
+                <h3 style="margin-top: 0; color: #007bff;">✨ What You Can Do:</h3>
+                <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                  <li>✓ View all your invoices</li>
+                  <li>✓ Download invoices as PDF</li>
+                  <li>✓ Make secure online payments</li>
+                  <li>✓ Track payment history</li>
+                  <li>✓ Monitor invoice status</li>
+                  <li>✓ Update your profile information</li>
+                </ul>
+              </div>
+
+              <!-- Support -->
+              <div style="background-color: #e7f5e9; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px; color: #1b5e20; font-size: 14px;">
+                <strong>📧 Need Help?</strong><br>
+                If you have any issues logging in or have questions, please contact <strong>${businessOwner.businessName}</strong> at <strong>${businessOwner.email}</strong>.
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="border-top: 1px solid #e0e0e0; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+              <p style="margin: 0;">InvoiceHub © 2024 | Professional Invoice Management</p>
+            </div>
+
+          </div>
+        </body>
+      </html>
+    `
+  };
+};
+
+/**
+ * Smart function: Try LLM first, fallback to template
+ */
+export const generateClientWelcomeEmailSmart = async (client, generatedPassword, businessOwner) => {
+  try {
+    return await generateClientWelcomeEmailByLLM(client, generatedPassword, businessOwner);
+  } catch (error) {
+    console.warn("⚠️ LLM generation failed, using fallback template...", error.message);
+    return generateClientWelcomeEmailFallback(client, generatedPassword, businessOwner);
+  }
+};

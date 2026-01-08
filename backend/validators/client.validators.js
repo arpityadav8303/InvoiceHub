@@ -32,6 +32,16 @@ const clientValidationSchema = Joi.object({
       "any.required": "Email is required"
     }),
 
+    password: Joi.string()
+    .min(8)
+    .max(50)
+    .trim()
+    .messages({
+      "string.min": "Password must be at least 8 characters",
+      "string.max": "Password cannot exceed 50 characters",
+      "any.required": "Password is required"
+    }),
+
   phone: Joi.string()
     .required()
     .pattern(/^\d{10}$/)

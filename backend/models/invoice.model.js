@@ -61,5 +61,16 @@ invoiceSchema.methods.calculateStatus = function() {
   this.remainingAmount = this.total - this.paidAmount;
   return this.status;
 };
+invoiceSchema.methods.getDaysOverdue = function() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dueDate = new Date(this.dueDate);
+  dueDate.setHours(0, 0, 0, 0);
+  
+  if (dueDate >= today) return 0; // Not overdue
+  
+  const diffTime = today - dueDate;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
 
 export default mongoose.model('Invoice', invoiceSchema);

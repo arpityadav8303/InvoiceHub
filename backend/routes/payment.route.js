@@ -5,7 +5,7 @@ import { recordPayment, getPayments, getPaymentsById, deletePayment } from '../c
 import rateLimiter from '../middleware/rate-limitor.js'
 const router = express.Router()
 
-router.post('/', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, validate(paymentCreateSchema), recordPayment)
+router.post('/', rateLimiter({ limit: 10, windowMinutes: 60 }), validate(paymentCreateSchema), recordPayment)
 router.get('/', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, getPayments)
 router.get('/:id', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, getPaymentsById)
 router.delete('/:id', protect, deletePayment)

@@ -32,7 +32,7 @@ export async function sendEmail(to, subject, htmlBody, attachments = []) {
         subject: subject,
         htmlContent: htmlBody,
         // Brevo uses 'attachment' (singular) for the array of objects
-        attachment: formattedAttachments 
+        attachment: formattedAttachments
     };
 
     try {
@@ -48,6 +48,7 @@ export async function sendEmail(to, subject, htmlBody, attachments = []) {
         );
 
         console.log(`✅ Email sent to ${to} with ${formattedAttachments.length} attachment(s)`);
+        console.log(`ℹ️  Sender used: ${payload.sender.email}`); // DEBUG LOG
         return { success: true, messageId: response.data.messageId };
     } catch (error) {
         const errorMsg = error.response?.data?.message || error.message;
@@ -56,44 +57,45 @@ export async function sendEmail(to, subject, htmlBody, attachments = []) {
     }
 }
 
-export async function sendEmailReminder(to,subject,htmlBody){
+export async function sendEmailReminder(to, subject, htmlBody) {
     const apiKey = process.env.EMAIL_PASSWORD;
-    if(!apiKey){
+    if (!apiKey) {
         throw new Error('EMAIL_PASSWORD (API Key) not found in .env');
     }
 
-    const payLoad={
-        sender:{
-            name:process.env.BUSINESS_NAME || 'InvoiceHub',
-            email:process.env.EMAIL_SENDER
+    const payLoad = {
+        sender: {
+            name: process.env.BUSINESS_NAME || 'InvoiceHub',
+            email: process.env.EMAIL_SENDER
         },
-        to:[{email:to}],
-        subject:subject,
-        htmlContent:htmlBody
+        to: [{ email: to }],
+        subject: subject,
+        htmlContent: htmlBody
     };
-     try {
-        const response=await axios.post(
-           'https://api.brevo.com/v3/smtp/email',
+    try {
+        const response = await axios.post(
+            'https://api.brevo.com/v3/smtp/email',
             payLoad,
             {
-            headers: {
+                headers: {
                     'api-key': apiKey,
                     'Content-Type': 'application/json'
                 }
             }
-         )
-          console.log(`✅ Email reminder sent to ${to}`);
+        )
+        console.log(`✅ Email reminder sent to ${to}`);
+        console.log(`ℹ️  Sender used: ${payLoad.sender.email}`); // DEBUG LOG
         // ✅ RETURN the response with messageId
-        return { 
-            success: true, 
+        return {
+            success: true,
             messageId: response.data.messageId,
             sentAt: new Date()
         };
-      } catch (error) {
-         const errorMsg = error.response?.data?.message || error.message;
+    } catch (error) {
+        const errorMsg = error.response?.data?.message || error.message;
         console.error(`❌ Email Service Error:`, errorMsg);
         throw new Error(`Failed to send email: ${errorMsg}`);
-      }
+    }
 }
 
 // import nodemailer from 'nodemailer';

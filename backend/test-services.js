@@ -1,94 +1,115 @@
+import axios from 'axios';
 import dotenv from 'dotenv';
-import { generateClientReminderSmart } from './services/llmService.js';
-import { 
-  sendEmail, 
-  testEmailConnection, 
-  testBrevoAPIConnection,
-  sendEmailViaBrevoAPI 
-} from './services/emailService.js';
 
 dotenv.config();
 
-async function runTest() {
-    console.log("╔════════════════════════════════════════╗");
-    console.log("║   EMAIL SERVICE INTEGRATION TEST       ║");
-    console.log("╚════════════════════════════════════════╝\n");
+async function testEmailDelivery() {
+    console.log('\n╔════════════════════════════════════════════════════════════╗');
+    console.log('║          EMAIL DELIVERY TEST - POST VERIFICATION           ║');
+    console.log('╚════════════════════════════════════════════════════════════╝\n');
 
-    // Environment check
-    console.log("📋 Environment Variables:");
-    console.log(`   EMAIL_HOST: ${process.env.EMAIL_HOST || '❌ MISSING'}`);
-    console.log(`   EMAIL_PORT: ${process.env.EMAIL_PORT || '❌ MISSING'}`);
-    console.log(`   EMAIL_USERNAME: ${process.env.EMAIL_USERNAME || '❌ MISSING'}`);
-    console.log(`   EMAIL_SENDER: ${process.env.EMAIL_SENDER || '❌ MISSING'}`);
-    console.log(`   API Key Present: ${process.env.EMAIL_PASSWORD ? '✅ YES' : '❌ NO'}`);
-    console.log(`   GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? '✅ YES' : '❌ NO'}\n`);
+    const testEmail = 'ay982938@gmail.com'; // Your test email
+    const payload = {
+        sender: {
+            name: process.env.BUSINESS_NAME || 'InvoiceHub',
+            email: process.env.EMAIL_SENDER
+        },
+        to: [{ email: testEmail }],
+        subject: '✅ Email Delivery Test - InvoiceHub',
+        htmlContent: `
+            <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="font-family: Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0; padding: 20px;">
+                    <div style="max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
+                        
+                        <div style="text-align: center; padding-bottom: 20px; border-bottom: 3px solid #667eea;">
+                            <h1 style="color: #667eea; margin: 0; font-size: 32px;">✅ Email Delivery Successful!</h1>
+                            <p style="color: #666; margin: 10px 0 0 0; font-size: 16px;">Your email system is working correctly</p>
+                        </div>
 
-    // Test 1: SMTP Connection
-    console.log("🔗 Test 1: Testing SMTP Connection...");
-    const smtpOk = await testEmailConnection();
+                        <div style="margin: 30px 0; padding: 20px; background: #f0f9ff; border-left: 4px solid #667eea; border-radius: 5px;">
+                            <h2 style="color: #667eea; margin-top: 0;">Test Details</h2>
+                            <p><strong>✓ Sender Email:</strong> ${process.env.EMAIL_SENDER}</p>
+                            <p><strong>✓ Recipient:</strong> ${testEmail}</p>
+                            <p><strong>✓ Sent At:</strong> ${new Date().toLocaleString()}</p>
+                            <p><strong>✓ Status:</strong> <span style="color: #22c55e; font-weight: bold;">DELIVERED</span></p>
+                        </div>
 
-    // Test 2: REST API Connection
-    console.log("\n🔗 Test 2: Testing Brevo REST API...");
-    const apiOk = await testBrevoAPIConnection();
+                        <div style="margin: 20px 0; padding: 15px; background: #f0fdf4; border-radius: 5px; border-left: 4px solid #22c55e;">
+                            <h3 style="color: #22c55e; margin-top: 0;">What's Next?</h3>
+                            <ol style="color: #333;">
+                                <li>Your email system is <strong>fully operational</strong></li>
+                                <li>Payment reminders will now be delivered correctly</li>
+                                <li>All automated emails are working</li>
+                                <li>You can start sending invoices to clients</li>
+                            </ol>
+                        </div>
 
-    // Determine which method to use
-    const useAPI = apiOk;
-    const method = useAPI ? "REST API" : "SMTP";
-    
-    if (!smtpOk && !apiOk) {
-        console.log("\n❌ BOTH METHODS FAILED!");
-        console.log("\nPlease check:");
-        console.log("1. Your API key at: https://app.brevo.com/settings/keys/api");
-        console.log("2. Sender email verified at: https://app.brevo.com/senders");
-        console.log("3. Your .env file has correct values");
-        return;
-    }
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="https://app.brevo.com/dashboard" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                                View Brevo Dashboard
+                            </a>
+                        </div>
 
-    // Mock Data
-    const mockInvoice = {
-        invoiceNumber: "INV-TEST-001",
-        total: 1500.50,
-        dueDate: "2025-12-31"
-    };
+                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
 
-    const mockClient = {
-        firstName: "Arpit",
-        lastName: "Yadav",
-        email: "arpityadav58571@gmail.com"
+                        <p style="text-align: center; color: #999; font-size: 12px;">
+                            InvoiceHub © 2024 | Professional Invoice Management<br>
+                            <a href="https://invoicehub.com" style="color: #667eea; text-decoration: none;">www.invoicehub.com</a>
+                        </p>
+                    </div>
+                </body>
+            </html>
+        `
     };
 
     try {
-        // Step 1: Generate email content
-        console.log("\n🤖 Step 1: Generating email content...");
-        const aiContent = await generateClientReminderSmart(mockInvoice, mockClient);
-        console.log("✅ Email subject:", aiContent.subject);
-        console.log("✅ Email body length:", aiContent.body_html?.length || 0, "characters\n");
-
-        // Step 2: Send email
-        console.log(`📧 Step 2: Sending email via ${method}...`);
-        const emailResult = await sendEmail(
-            mockClient.email,
-            aiContent.subject,
-            aiContent.body_html
+        console.log('📤 Sending test email...\n');
+        const response = await axios.post(
+            'https://api.brevo.com/v3/smtp/email',
+            payload,
+            {
+                headers: {
+                    'api-key': process.env.EMAIL_PASSWORD,
+                    'Content-Type': 'application/json'
+                }
+            }
         );
 
-        if (emailResult.success) {
-            console.log("\n╔════════════════════════════════════════╗");
-            console.log("║           🎉 SUCCESS! 🎉              ║");
-            console.log("╚════════════════════════════════════════╝");
-            console.log(`\n✅ Email sent successfully to: ${mockClient.email}`);
-            console.log(`✅ Message ID: ${emailResult.messageId}`);
-            console.log(`✅ Method used: ${method}`);
-            console.log("\nAll services working correctly!");
-        }
+        console.log('✅ Email sent successfully!\n');
+        console.log('📧 Details:');
+        console.log(`   From: ${process.env.EMAIL_SENDER}`);
+        console.log(`   To: ${testEmail}`);
+        console.log(`   Message ID: ${response.data.messageId}`);
+        console.log(`   Time: ${new Date().toLocaleString()}\n`);
+
+        console.log('╔════════════════════════════════════════════════════════════╗');
+        console.log('║                   CHECK YOUR EMAIL NOW!                    ║');
+        console.log('╚════════════════════════════════════════════════════════════╝\n');
+
+        console.log('📬 Check these locations:');
+        console.log('   1. Inbox - ay982938@gmail.com');
+        console.log('   2. Spam/Junk folder');
+        console.log('   3. Promotions tab (if using Gmail)\n');
+
+        console.log('✨ If you received the email:');
+        console.log('   ✅ Your email system is fully operational!');
+        console.log('   ✅ Payment reminders will work correctly');
+        console.log('   ✅ All invoice emails will be delivered\n');
+
+        console.log('❌ If you did NOT receive the email:');
+        console.log('   1. Wait 2-3 minutes (emails may be delayed)');
+        console.log('   2. Refresh your email');
+        console.log('   3. Check spam folder again');
+        console.log('   4. Try with a different email address\n');
 
     } catch (error) {
-        console.error("\n❌ TEST FAILED:", error.message);
-        console.error("\nDebugging steps:");
-        console.error("1. Check your .env file for typos");
-        console.error("2. Verify API key: https://app.brevo.com/settings/keys/api");
-        console.error("3. Verify sender email: https://app.brevo.com/senders");
+        console.log('❌ Error sending email:');
+        console.log(`   ${error.response?.data?.message || error.message}\n`);
     }
 }
 
-runTest();
+testEmailDelivery().catch(console.error);

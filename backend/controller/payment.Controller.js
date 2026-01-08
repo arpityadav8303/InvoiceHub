@@ -23,8 +23,8 @@ const recordPayment = async (req, res) => {
     // Ensure paymentDate is a Date object
     const paymentDateObj = new Date(paymentDate);
 
-    // Step 1: Find invoice
-    const invoice = await Invoice.findOne({ _id: invoiceId, userId: req.user._id });
+    // Step 1: Find invoice (FIXED: Use findById instead of findOne)
+    const invoice = await Invoice.findById(invoiceId);
     if (!invoice) {
       return res.status(404).json({ success: false, message: 'Invoice not found' });
     }
@@ -46,9 +46,17 @@ const recordPayment = async (req, res) => {
     const client = await Client.findById(invoice.clientId);
     const user = await User.findById(invoice.userId);
 
-    // Step 4: Create Payment Record
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Business owner not found' });
+    }
+
+    // Step 4: Create Payment Record (FIXED: No req.user since this is public)
     const newPayment = await Payment.create({
-      userId: req.user._id,
+      userId: invoice.userId, // Use invoice owner's userId, not client
       invoiceId,
       clientId: invoice.clientId,
       amount,
@@ -89,7 +97,7 @@ const recordPayment = async (req, res) => {
 
     const updatedClient = await Client.findById(invoice.clientId);
 
-    // Example reliability score calculation (adjust as needed)
+    // Calculate reliability score
     const totalPayments =
       updatedClient.paymentStats.onTimePayments + updatedClient.paymentStats.latePayments;
     const newReliabilityScore =

@@ -1,54 +1,76 @@
 import User from '../models/user.model.js'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+import Client from '../models/client.model.js'
 
 dotenv.config()
 
+
+
 const protect = async (req, res, next) => {
   try {
-    let token
+    let token;
 
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1]
+      token = req.headers.authorization.split(' ')[1];
     }
 
     if (!token) {
       return res.status(401).json({
         success: false,
         message: 'Not authorized to access this route'
-      })
+      });
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET)
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      const user = await User.findById(decoded.id)
+      let entity;
 
-      if (!user) {
-        return res.status(404).json({
+      if (decoded.model === 'user') {
+        entity = await User.findById(decoded.id);
+      } else if (decoded.model === 'client') {
+        entity = await Client.findById(decoded.id);
+      } else {
+        return res.status(400).json({
           success: false,
-          message: 'User not found'
-        })
+          message: 'Invalid token payload: unknown model type'
+        });
       }
 
-      req.user = user  // ✅ THIS IS CRITICAL
+      if (!entity) {
+        return res.status(404).json({
+          success: false,
+          message: `${decoded.model} not found`
+        });
+      }
 
-      next()
+      // Attach to request depending on type
+      if (decoded.model === 'user') {
+        req.user = entity;
+      } else {
+        req.client = entity;
+      }
+
+      next();
     } catch (error) {
       return res.status(401).json({
         success: false,
         message: 'Token is invalid or expired'
-      })
+      });
     }
   } catch (error) {
-    console.error('Auth middleware error:', error)
+    console.error('Auth middleware error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error in auth middleware',
       error: error.message
-    })
+    });
   }
-}
+};
+
+
+
 // middleware/validate.middleware.js
 export const validate = (schema) => {
   return (req, res, next) => {

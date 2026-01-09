@@ -1,16 +1,27 @@
 import User from '../models/user.model.js'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+import Client from '../models/client.model.js'
+import bcrypt from 'bcryptjs'
 
 dotenv.config()
 
-const generateToken = (id) => {
-  const expiresIn = process.env.JWT_EXPIRE || '7d'
-  const token = jwt.sign({ id }, process.env.JWT_SECRET, {
+// const generateToken = (id) => {
+//   const expiresIn = process.env.JWT_EXPIRE || '7d'
+//   const token = jwt.sign({ id }, process.env.JWT_SECRET, {
+//     expiresIn: expiresIn
+//   })
+//   return token
+// }
+
+const generateToken = (id, model) => {
+  const expiresIn = process.env.JWT_EXPIRE || '7d';
+  const token = jwt.sign({ id, model }, process.env.JWT_SECRET, {
     expiresIn: expiresIn
-  })
-  return token
-}
+  });
+  return token;
+};
+
 
 const registerUser = async (req, res) => {
   try {
@@ -63,7 +74,7 @@ const registerUser = async (req, res) => {
     })
 
     // Generate JWT token
-    const token = generateToken(newUser._id)
+    const token = generateToken(newUser._id, 'user')
 
     // Return response with user data (without password)
     res.status(201).json({
@@ -126,7 +137,7 @@ const loginUser = async (req, res) => {
       })
     }
 
-    const token = generateToken(user._id)
+    const token = generateToken(user._id, 'user')
 
     res.status(200).json({
       success: true,
@@ -152,10 +163,133 @@ const loginUser = async (req, res) => {
   }
 }
 
-const logoutUser= (req, res) => {
+const loginClient = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and password'
+      });
+    }
+
+    const client = await Client.findOne({ email }).select('+password');
+
+    console.log(`🔍 Login attempt for: ${email}`);
+    console.log(`   Client found: ${!!client}`);
+
+    if (!client) {
+      console.log('❌ Client not found in DB');
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    console.log(`   Password hash present: ${!!client.password}`);
+    if (!client.password) {
+      console.log('❌ CRITICAL: Client has NO password hash! Re-create account.');
+      return res.status(400).json({
+        success: false,
+        message: 'Account corrupted: Password missing. Please contact support or recreate account.'
+      });
+    }
+
+    const isPasswordValid = await client.comparePassword(password);
+    console.log(`   Password valid: ${isPasswordValid}`);
+
+    if (!isPasswordValid) {
+      console.log('❌ Password mismatch');
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    const token = generateToken(client._id, 'client');
+
     res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      token: token,
+      client: {
+        _id: client._id,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+        businessName: client.businessName,
+        phone: client.phone,
+        businessType: client.businessType
+      }
+    });
+  }
+  catch (error) {
+    console.error('Login error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Server error during login',
+      error: error.message
+    })
+  }
+}
+
+const updateClientPassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide oldPassword and newPassword"
+      })
+    }
+
+    const client = await Client.findById(req.client._id).select('+password');
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: "Client not found"
+      })
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, client.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Old password is incorrect'
+      });
+    }
+
+    client.password=newPassword
+
+
+    await client.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully"
+    })
+
+
+  }
+
+  catch (error) {
+    console.error('Update password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during password update',
+      error: error.message
+    });
+  }
+
+
+}
+
+const logoutUser = (req, res) => {
+  res.status(200).json({
     success: true,
     message: 'Logged out successfully'
   });
 }
-export  {registerUser,loginUser,logoutUser}
+export { registerUser, loginUser, logoutUser, loginClient, updateClientPassword }

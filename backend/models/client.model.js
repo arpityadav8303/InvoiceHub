@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs'
 import mongoose from 'mongoose'
 
 const clientSchema = new mongoose.Schema(
@@ -7,48 +8,49 @@ const clientSchema = new mongoose.Schema(
       ref: 'User',
       required: true
     },
-    
+
     firstName: {
       type: String,
       required: true
     },
-    
+
     lastName: {
       type: String,
       required: true
     },
-    
+
     email: {
       type: String,
       required: true
     },
-    paasword:{
-      type:String,
+    password: {
+      type: String,
+      select: false,
     },
     phone: {
       type: String,
       required: true
     },
-    
+
     companyName: {
       type: String
     },
-    
+
     address: {
       street: String,
       city: String,
       state: String,
       zipCode: String
     },
-    
+
     gstNumber: String,
-    
+
     preferredPaymentMethod: {
       type: String,
       enum: ['bank_transfer', 'cheque', 'upi', 'card'],
       default: 'bank_transfer'
     },
-    
+
     paymentStats: {
       totalInvoices: {
         type: Number,
@@ -85,15 +87,15 @@ const clientSchema = new mongoose.Schema(
       lastPaymentDate: Date,
       lastInvoiceDate: Date
     },
-    
+
     notes: String,
-    
+
     riskLevel: {
       type: String,
       enum: ['LOW', 'MEDIUM', 'HIGH'],
       default: 'LOW'
     },
-    
+
     status: {
       type: String,
       enum: ['active', 'inactive'],
@@ -108,11 +110,11 @@ const clientSchema = new mongoose.Schema(
 clientSchema.index({ userId: 1, email: 1 })
 clientSchema.index({ userId: 1, createdAt: -1 })
 
-clientSchema.methods.getFullName = function() {
+clientSchema.methods.getFullName = function () {
   return `${this.firstName} ${this.lastName}`
 }
 
-clientSchema.pre('save', async function() {
+clientSchema.pre('save', async function () {
   if (!this.isModified('password')) {
     return
   }
@@ -126,15 +128,15 @@ clientSchema.pre('save', async function() {
 })
 
 // Method to compare password
-clientSchema.methods.comparePassword = async function(enteredPassword) {
+clientSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password)
 }
 
-clientSchema.methods.calculateReliabilityScore = function() {
+clientSchema.methods.calculateReliabilityScore = function () {
   if (this.paymentStats.totalInvoices === 0) return 0
-  
+
   const onTimePercentage = (this.paymentStats.onTimePayments / this.paymentStats.totalInvoices) * 100
-  
+
   return Math.round(onTimePercentage)
 }
 

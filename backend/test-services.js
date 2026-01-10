@@ -82,7 +82,7 @@ async function testEmailDelivery() {
         console.log('✅ Email sent successfully!\n');
         console.log('📧 Details:');
         console.log(`   From: ${process.env.EMAIL_SENDER}`);
-        console.log(`   To: ${testEmail}`);
+        console.log(`   Amount: ₹${invoice.total}`);
         console.log(`   Message ID: ${response.data.messageId}`);
         console.log(`   Time: ${new Date().toLocaleString()}\n`);
 

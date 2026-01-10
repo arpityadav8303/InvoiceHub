@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 export const generateInvoicePDF = (invoice, client, user, payment) => {
   // Dynamically set currency symbol
-  const currency = user.preferences?.invoiceCurrency === 'INR' ? '₹' : '$';
+  const currency = '₹';
 
   return new Promise((resolve, reject) => {
     try {

@@ -33,7 +33,7 @@ Your task is to generate a sophisticated, branded payment reminder email that ma
 - Client Name: ${client.firstName} ${client.lastName}
 - Client Email: ${client.email}
 - Invoice Number: ${invoice.invoiceNumber}
-- Amount Due: $${invoice.total}
+- Amount Due: ₹${invoice.total}
 - Due Date: ${invoice.dueDate}
 
 ---
@@ -64,7 +64,7 @@ Example: "Payment Reminder: Invoice INV-2024-001 - Due on December 25, 2024"
 #### 5. INVOICE DETAILS SECTION:
 Present in a card-style box with left border (#007bff):
 - Invoice Number: ${invoice.invoiceNumber}
-- Amount Due: $${invoice.total} (with currency formatting)
+- Amount Due: ₹${invoice.total} (with currency formatting)
 - Due Date: ${invoice.dueDate}
 - Use table layout for clarity
 - Include subtle background color (#f8f9fa)
@@ -142,14 +142,14 @@ Generate the complete email now following all specifications above.
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text().trim();
-    
+
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const emailContent = JSON.parse(cleanText);
-    
+
     if (!emailContent.subject || !emailContent.body_html) {
       throw new Error("AI response missing required fields");
     }
-    
+
     return emailContent;
   } catch (error) {
     console.error("LLM Error:", error.message);
@@ -185,8 +185,8 @@ export const generatePaymentConfirmationEmail = async (payment, invoice, client,
   });
 
   // Format items list
-  const itemsList = invoice.items.map(item => 
-    `${item.description} (Qty: ${item.quantity}, Rate: $${item.rate.toFixed(2)}, Amount: $${item.amount.toFixed(2)})`
+  const itemsList = invoice.items.map(item =>
+    `${item.description} (Qty: ${item.quantity}, Rate: ₹${item.rate.toFixed(2)}, Amount: ₹${item.amount.toFixed(2)})`
   ).join('\n');
 
   const prompt = `
@@ -221,14 +221,14 @@ ${user.address ? `- Company Address: ${user.address.street || ''} ${user.address
 - Invoice Number: ${invoice.invoiceNumber}
 - Invoice Date: ${invoiceDate}
 - Due Date: ${dueDate}
-- Subtotal: $${invoice.subtotal.toFixed(2)}
-- Discount: $${invoice.discount.toFixed(2)}
+- Subtotal: ₹${invoice.subtotal.toFixed(2)}
+- Discount: ₹${invoice.discount.toFixed(2)}
 - Tax Rate: ${invoice.taxRate}%
-- Tax Amount: $${invoice.tax.toFixed(2)}
-- Total Amount: $${invoice.total.toFixed(2)}
+- Tax Amount: ₹${invoice.tax.toFixed(2)}
+- Total Amount: ₹${invoice.total.toFixed(2)}
 
 **Payment Details:**
-- Payment Amount: $${payment.amount.toFixed(2)}
+- Payment Amount: ₹${payment.amount.toFixed(2)}
 - Payment Date: ${paymentDate}
 - Payment Method: ${payment.paymentMethod}
 ${payment.transactionId ? `- Transaction ID: ${payment.transactionId}` : ''}
@@ -373,14 +373,14 @@ Generate the complete professional payment confirmation email now.
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text().trim();
-    
+
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const emailContent = JSON.parse(cleanText);
-    
+
     if (!emailContent.subject || !emailContent.body_html) {
       throw new Error("AI response missing required fields (subject or body_html)");
     }
-    
+
     return emailContent;
   } catch (error) {
     console.error("LLM Payment Email Error:", error.message);
@@ -428,18 +428,18 @@ export const generatePaymentConfirmationFallback = (payment, invoice, client, us
 
             <div style="background-color: #f0f7ff; border: 2px solid #007bff; padding: 20px; margin: 20px 0; border-radius: 4px;">
               <h3 style="margin-top: 0; color: #007bff;">Invoice Summary</h3>
-              <p><strong>Subtotal:</strong> $${invoice.subtotal.toFixed(2)}</p>
-              ${invoice.discount > 0 ? `<p><strong>Discount:</strong> -$${invoice.discount.toFixed(2)}</p>` : ''}
-              <p><strong>Tax (${invoice.taxRate}%):</strong> $${invoice.tax.toFixed(2)}</p>
+              <p><strong>Subtotal:</strong> ₹${invoice.subtotal.toFixed(2)}</p>
+              ${invoice.discount > 0 ? `<p><strong>Discount:</strong> -₹${invoice.discount.toFixed(2)}</p>` : ''}
+              <p><strong>Tax (${invoice.taxRate}%):</strong> ₹${invoice.tax.toFixed(2)}</p>
               <p style="font-size: 18px; font-weight: 700; color: #007bff; border-top: 2px solid #007bff; padding-top: 10px; margin-top: 10px;">
-                <strong>Total Paid:</strong> $${invoice.total.toFixed(2)}
+                <strong>Total Paid:</strong> ₹${invoice.total.toFixed(2)}
               </p>
             </div>
 
             <div style="background-color: #e7f5e9; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;">
               <h3 style="margin-top: 0; color: #28a745;">💳 Payment Details</h3>
               <p><strong>Payment Method:</strong> ${payment.paymentMethod.replace('_', ' ').toUpperCase()}</p>
-              <p><strong>Amount Paid:</strong> <span style="font-weight: 600;">$${payment.amount.toFixed(2)}</span></p>
+              <p><strong>Amount Paid:</strong> <span style="font-weight: 600;">₹${payment.amount.toFixed(2)}</span></p>
               <p><strong>Payment Date:</strong> ${paymentDate}</p>
               ${payment.transactionId ? `<p><strong>Transaction ID:</strong> ${payment.transactionId}</p>` : ''}
               ${payment.referenceNumber ? `<p><strong>Reference:</strong> ${payment.referenceNumber}</p>` : ''}
@@ -482,7 +482,7 @@ export const generatePaymentConfirmationEmailSmart = async (payment, invoice, cl
     return generatePaymentConfirmationFallback(payment, invoice, client, user);
   }
 };
- 
+
 /**
  * Fallback: Generate reminder template without AI
  */
@@ -500,7 +500,7 @@ export const generateClientReminderFallback = (invoice, client) => {
           <div style="background: #f5f5f5; padding: 15px; border-left: 4px solid #007bff; margin: 20px 0;">
             <p><strong>Invoice Details:</strong></p>
             <p>Invoice Number: <strong>${invoice.invoiceNumber}</strong></p>
-            <p>Amount Due: <strong>$${invoice.total}</strong></p>
+            <p>Amount Due: <strong>₹${invoice.total}</strong></p>
             <p>Due Date: <strong>${new Date(invoice.dueDate).toLocaleDateString()}</strong></p>
           </div>
           
@@ -711,7 +711,7 @@ Generate the welcome email now:
 
     // Remove markdown code fences if present
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
-    
+
     // Parse JSON
     const emailContent = JSON.parse(cleanText);
 

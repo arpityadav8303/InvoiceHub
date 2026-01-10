@@ -109,6 +109,9 @@ const clientSchema = new mongoose.Schema(
 
 clientSchema.index({ userId: 1, email: 1 })
 clientSchema.index({ userId: 1, createdAt: -1 })
+clientSchema.index({ userId: 1, 'paymentStats.paymentReliabilityScore': -1 });
+clientSchema.index({ userId: 1, riskLevel: 1 });
+clientSchema.index({ userId: 1, status: 1 });
 
 clientSchema.methods.getFullName = function () {
   return `${this.firstName} ${this.lastName}`

@@ -67,6 +67,8 @@ const paymentSchema = new mongoose.Schema(
 paymentSchema.index({ userId: 1, invoiceId: 1 });
 paymentSchema.index({ userId: 1, paymentDate: -1 });
 paymentSchema.index({ invoiceId: 1 });
+paymentSchema.index({ userId: 1, createdAt: -1 });
+paymentSchema.index({ invoiceId: 1, createdAt: -1 });
 
 const Payment = mongoose.model('Payment', paymentSchema);
 

@@ -14,7 +14,7 @@ const runAutomatedReminders = async () => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Start of today
-    
+
     console.log(`📅 Looking for invoices due before: ${today.toDateString()}`);
 
     // Find all invoices that are overdue and not yet paid
@@ -40,7 +40,7 @@ const runAutomatedReminders = async () => {
     for (const invoice of overdueInvoices) {
       try {
         const client = invoice.clientId;
-        
+
         // Validate client exists and has email
         if (!client || !client.email) {
           console.warn(`⚠️  Skipping Invoice ${invoice.invoiceNumber}: No valid client email`);
@@ -54,7 +54,7 @@ const runAutomatedReminders = async () => {
 
         console.log(`📨 Processing Invoice: ${invoice.invoiceNumber}`);
         console.log(`   Client: ${client.firstName} ${client.lastName} (${client.email})`);
-        console.log(`   Amount: $${invoice.total} | Days Overdue: ${invoice.getDaysOverdue()}`);
+        console.log(`   Amount: ₹${invoice.total} | Days Overdue: ${invoice.getDaysOverdue()}`);
 
         // Generate AI-powered reminder email content
         console.log(`   🤖 Generating reminder email...`);
@@ -95,10 +95,10 @@ const runAutomatedReminders = async () => {
       } catch (err) {
         failureCount++;
         const errorMsg = err.message || 'Unknown error';
-        
+
         console.error(`   ❌ Failed to send reminder for Invoice ${invoice.invoiceNumber}`);
         console.error(`   Error: ${errorMsg}\n`);
-        
+
         errors.push({
           invoiceNumber: invoice.invoiceNumber,
           clientEmail: invoice.clientId?.email || 'N/A',
@@ -121,7 +121,7 @@ const runAutomatedReminders = async () => {
         console.log(`   ${index + 1}. Invoice: ${result.invoiceNumber}`);
         console.log(`      Client: ${result.clientName}`);
         console.log(`      Email: ${result.clientEmail}`);
-        console.log(`      Amount: $${result.amount}`);
+        console.log(`      Amount: ₹${result.amount}`);
         console.log(`      Days Overdue: ${result.daysOverdue}`);
         console.log(`      Message ID: ${result.messageId}`);
       });
@@ -140,7 +140,7 @@ const runAutomatedReminders = async () => {
   } catch (error) {
     console.error('\n❌ SCHEDULER ERROR:', error.message);
     console.error('Stack:', error.stack);
-    
+
     console.log('\n╔════════════════════════════════════════╗');
     console.log('║     ❌ SCHEDULER EXECUTION FAILED      ║');
     console.log('╚════════════════════════════════════════╝\n');
@@ -171,7 +171,7 @@ const logSchedulerCompletion = (startTime, successCount, failureCount) => {
 export const initScheduler = () => {
   try {
     const scheduledTime = '0 9 * * *'; // 9:00 AM every day
-    
+
     console.log('\n╔════════════════════════════════════════╗');
     console.log('║   📅 PAYMENT REMINDER SCHEDULER       ║');
     console.log('║   Status: INITIALIZING...             ║');

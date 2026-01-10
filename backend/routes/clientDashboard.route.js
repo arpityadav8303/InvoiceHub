@@ -1,5 +1,6 @@
 import express from "express";
 import { getClientDashboardOverview,getInvoiceDetails,downloadInvoicePDF,getClientPayments,getClientProfile } from "../controller/clientDashboard.js";
+import { updateClientPassword } from "../controller/auth.controller.js";
 import rateLimiter from '../middleware/rate-limitor.js'
 import { protect } from '../middleware/auth.middleware.js';
 
@@ -33,6 +34,12 @@ router.get("/clientProfile",
     rateLimiter({ limit: 20, windowMinutes: 60 }),
     protect,
     getClientProfile
+)
+
+router.put("/updateClientPassword",
+    rateLimiter({ limit: 20, windowMinutes: 60 }),
+    protect,
+    updateClientPassword
 )
 
 

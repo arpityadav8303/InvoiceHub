@@ -1,4 +1,5 @@
 import express from "express";
+import mongoSanitize from 'express-mongo-sanitize';
 import dotenv from "dotenv";
 import connectdb from "../backend/db/DB.js"; 
 import authRoutes from "../backend/routes/auth.route.js";
@@ -10,6 +11,8 @@ import clientDashboardRoutes from "./routes/clientDashboard.route.js"
 import dayjs from "dayjs";
 import paymentReminderRoutes from "../backend/routes/paymentReminder.route.js";
 import { initScheduler } from "./Utils/scheduler.js";
+import cors from "cors";
+import { errorHandler,asyncHandler } from "./middleware/errorHandler.js";
 
 
 dotenv.config();
@@ -18,13 +21,19 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-
+app.use(mongoSanitize());
 connectdb();
 initScheduler();
 
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 app.use('/api/auth', authRoutes)
 app.use('/api/client', clientRoutes)
@@ -33,6 +42,7 @@ app.use('/api/payment', paymentRoutes)
 app.use('/api/payment-reminder', paymentReminderRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/clientDashboard',clientDashboardRoutes)
+app.use(errorHandler);
 
 
 const PORT = process.env.PORT || 5000;

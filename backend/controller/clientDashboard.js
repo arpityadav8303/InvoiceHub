@@ -4,6 +4,7 @@
 import Invoice from '../models/invoice.model.js';
 import Payment from '../models/payment.model.js';
 import Client from '../models/client.model.js';
+import User from '../models/user.model.js';
 
 /**
  * Get Client Dashboard Overview

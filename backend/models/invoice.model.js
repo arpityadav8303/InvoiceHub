@@ -46,6 +46,13 @@ invoiceSchema.index({ userId: 1, dueDate: 1 });
 invoiceSchema.index({ userId: 1, createdAt: -1 });
 invoiceSchema.index({ clientId: 1, status: 1 });
 
+invoiceSchema.methods.updateStatusIfOverdue = function() {
+  if (this.dueDate < new Date() && this.status !== 'paid' && this.status !== 'partially_paid') {
+    this.status = 'overdue';
+  }
+  return this;
+};
+
 invoiceSchema.methods.calculateTotals = function() {
   this.subtotal = this.items.reduce((sum, item) => sum + item.amount, 0);
   this.tax = (this.subtotal * this.taxRate) / 100;

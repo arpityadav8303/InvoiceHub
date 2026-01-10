@@ -6,6 +6,7 @@ import clientRoutes from "../backend/routes/client.route.js";
 import invoiceRoutes from "../backend/routes/invoice.route.js";
 import paymentRoutes from "../backend/routes/payment.route.js";
 import dashboardRoutes from "../backend/routes/dashboard.route.js";
+import clientDashboardRoutes from "./routes/clientDashboard.route.js"
 import dayjs from "dayjs";
 import paymentReminderRoutes from "../backend/routes/paymentReminder.route.js";
 import { initScheduler } from "./Utils/scheduler.js";
@@ -31,6 +32,7 @@ app.use('/api/invoice', invoiceRoutes)
 app.use('/api/payment', paymentRoutes)
 app.use('/api/payment-reminder', paymentReminderRoutes)
 app.use('/api/dashboard', dashboardRoutes)
+app.use('/api/clientDashboard',clientDashboardRoutes)
 
 
 const PORT = process.env.PORT || 5000;

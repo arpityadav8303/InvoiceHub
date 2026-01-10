@@ -974,3 +974,238 @@ function calculateClientListSummary(clients, totalCount) {
     }
   };
 }
+
+
+
+/**
+ * Get Comprehensive Client Profile
+ * GET /api/dashboard/clients/:id/profile
+ */
+export const getClientProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = new mongoose.Types.ObjectId(req.user._id);
+
+    // ========== VALIDATE CLIENT ==========
+    const client = await Client.findById(id);
+
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        message: 'Client not found'
+      });
+    }
+
+    if (client.userId.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this client'
+      });
+    }
+
+    // ========== FETCH INVOICES & PAYMENTS ==========
+    const invoices = await Invoice.find({ clientId: id })
+      .sort({ invoiceDate: -1 })
+      .lean();
+
+    const payments = await Payment.find({ clientId: id })
+      .sort({ paymentDate: -1 })
+      .lean();
+
+    // ========== CALCULATE INVOICE SUMMARY ==========
+    const invoiceSummary = calculateInvoiceSummary(invoices);
+
+    // ========== GET RECENT INVOICES ==========
+    const recentInvoices = invoices.slice(0, 5).map(inv => ({
+      invoiceNumber: inv.invoiceNumber,
+      amount: parseFloat((inv.total || 0).toFixed(2)),
+      status: inv.status,
+      dueDate: inv.dueDate,
+      paidAmount: parseFloat((inv.paidAmount || 0).toFixed(2)),
+      remainingAmount: parseFloat((inv.remainingAmount || 0).toFixed(2))
+    }));
+
+    // ========== GET PAYMENT HISTORY ==========
+    const paymentHistory = payments.slice(0, 5).map(pay => ({
+      amount: parseFloat((pay.amount || 0).toFixed(2)),
+      paymentDate: pay.paymentDate,
+      paymentMethod: pay.paymentMethod,
+      transactionId: pay.transactionId
+    }));
+
+    // ========== CALCULATE RELATIONSHIP LENGTH ==========
+    const relationshipLength = calculateRelationshipLength(client.createdAt);
+
+    // ========== BUILD RESPONSE ==========
+    res.status(200).json({
+      success: true,
+      message: 'Client profile fetched successfully',
+      data: {
+        // BASIC INFO
+        basicInfo: {
+          _id: client._id,
+          firstName: client.firstName,
+          lastName: client.lastName,
+          email: client.email,
+          phone: client.phone,
+          companyName: client.companyName || 'N/A',
+          status: client.status,
+          riskLevel: client.riskLevel,
+          createdAt: client.createdAt
+        },
+
+        // CONTACT INFO
+        contactInfo: {
+          email: client.email,
+          phone: client.phone,
+          address: {
+            street: client.address?.street || 'N/A',
+            city: client.address?.city || 'N/A',
+            state: client.address?.state || 'N/A',
+            zipCode: client.address?.zipCode || 'N/A'
+          },
+          gstNumber: client.gstNumber || 'N/A',
+          preferredPaymentMethod: client.preferredPaymentMethod || 'bank_transfer'
+        },
+
+        // PAYMENT STATS
+        paymentStats: {
+          totalInvoices: client.paymentStats.totalInvoices,
+          totalAmount: parseFloat((client.paymentStats.totalAmount || 0).toFixed(2)),
+          totalPaid: parseFloat((client.paymentStats.totalPaid || 0).toFixed(2)),
+          totalUnpaid: parseFloat((client.paymentStats.totalUnpaid || 0).toFixed(2)),
+          paymentReliabilityScore: client.paymentStats.paymentReliabilityScore,
+          onTimePayments: client.paymentStats.onTimePayments,
+          latePayments: client.paymentStats.latePayments,
+          averageDaysToPayment: client.paymentStats.averageDaysToPayment,
+          lastPaymentDate: client.paymentStats.lastPaymentDate,
+          lastInvoiceDate: client.paymentStats.lastInvoiceDate
+        },
+
+        // INVOICE SUMMARY
+        invoiceSummary,
+
+        // RECENT INVOICES
+        recentInvoices: {
+          count: recentInvoices.length,
+          invoices: recentInvoices
+        },
+
+        // PAYMENT HISTORY
+        paymentHistory: {
+          count: paymentHistory.length,
+          payments: paymentHistory,
+          totalPayments: payments.length
+        },
+
+        // RELATIONSHIP INFO
+        relationshipInfo: {
+          customerSince: client.createdAt,
+          relationshipLength: relationshipLength,
+          notes: client.notes || 'No notes'
+        },
+
+        // SUMMARY METRICS
+        summaryMetrics: {
+          collectionRate: calculateCollectionRate(client.paymentStats),
+          averageInvoiceValue: invoices.length > 0 
+            ? parseFloat((client.paymentStats.totalAmount / client.paymentStats.totalInvoices).toFixed(2))
+            : 0,
+          outstandingDays: calculateOutstandingDays(invoices)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Client Profile Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching client profile',
+      error: error.message
+    });
+  }
+};
+
+// ========== HELPER FUNCTIONS ==========
+
+/**
+ * Calculate invoice summary by status
+ */
+function calculateInvoiceSummary(invoices) {
+  const now = new Date();
+  
+  const draft = invoices.filter(inv => inv.status === 'draft').length;
+  const sent = invoices.filter(inv => inv.status === 'sent').length;
+  const paid = invoices.filter(inv => inv.status === 'paid').length;
+  const partiallyPaid = invoices.filter(inv => inv.status === 'partially_paid').length;
+  
+  const overdue = invoices.filter(inv => 
+    inv.dueDate && new Date(inv.dueDate) < now && inv.status !== 'paid'
+  ).length;
+
+  const totalAmount = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+  const paidAmount = invoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+  const unpaidAmount = totalAmount - paidAmount;
+
+  return {
+    draft,
+    sent,
+    paid,
+    partiallyPaid,
+    overdue,
+    totalInvoices: invoices.length,
+    totalAmount: parseFloat(totalAmount.toFixed(2)),
+    paidAmount: parseFloat(paidAmount.toFixed(2)),
+    unpaidAmount: parseFloat(unpaidAmount.toFixed(2))
+  };
+}
+
+/**
+ * Calculate collection rate percentage
+ */
+function calculateCollectionRate(paymentStats) {
+  if (paymentStats.totalAmount === 0) return 0;
+  
+  const rate = (paymentStats.totalPaid / paymentStats.totalAmount) * 100;
+  return parseFloat(rate.toFixed(2));
+}
+
+/**
+ * Calculate relationship length in readable format
+ */
+function calculateRelationshipLength(createdAt) {
+  const now = new Date();
+  const created = new Date(createdAt);
+  
+  const monthsDiff = (now.getFullYear() - created.getFullYear()) * 12 + 
+                     (now.getMonth() - created.getMonth());
+  
+  if (monthsDiff < 1) {
+    return 'Less than a month';
+  } else if (monthsDiff < 12) {
+    return `${monthsDiff} month(s)`;
+  } else {
+    const years = Math.floor(monthsDiff / 12);
+    const months = monthsDiff % 12;
+    return months > 0 
+      ? `${years} year(s) and ${months} month(s)` 
+      : `${years} year(s)`;
+  }
+}
+
+/**
+ * Calculate average days invoices remain outstanding
+ */
+function calculateOutstandingDays(invoices) {
+  const now = new Date();
+  const unpaidInvoices = invoices.filter(inv => inv.status !== 'paid');
+  
+  if (unpaidInvoices.length === 0) return 0;
+  
+  const totalDays = unpaidInvoices.reduce((sum, inv) => {
+    const createdDate = new Date(inv.invoiceDate);
+    const days = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+    return sum + days;
+  }, 0);
+  
+  return Math.round(totalDays / unpaidInvoices.length);
+}

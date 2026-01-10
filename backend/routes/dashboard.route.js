@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardOverview,getRevenueAnalytics,getRevenueSummary,getAdvancedClientList } from '../controller/dashboard.controller.js';
+import { getDashboardOverview,getRevenueAnalytics,getRevenueSummary,getAdvancedClientList,getClientProfile } from '../controller/dashboard.controller.js';
 import { protect } from '../middleware/auth.middleware.js'; // Ensure user is logged in
 import rateLimiter from '../middleware/rate-limitor.js'
 import { getClientRiskAssessment } from '../controller/userRiskAssesment.controller.js';
@@ -32,6 +32,13 @@ router.get(
   rateLimiter({ limit: 20, windowMinutes: 60 }),
   protect,
   getClientRiskAssessment
+);
+
+router.get(
+  '/client-profile/:id',
+  rateLimiter({ limit: 20, windowMinutes: 60 }),
+  protect,
+  getClientProfile
 );
 
 

@@ -1,14 +1,5 @@
 import { useState } from 'react';
 
-/**
- * Password Input Component with Show/Hide Toggle
- * @param {string} label - Input label
- * @param {string} placeholder - Placeholder text
- * @param {string} value - Current password value
- * @param {function} onChange - Change handler
- * @param {string} error - Error message (if any)
- * @param {boolean} required - Is field required?
- */
 function PasswordInput({
   label,
   placeholder,

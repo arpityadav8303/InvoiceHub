@@ -1,5 +1,4 @@
 import axios from 'axios';
-
 const API_URL = '/api';
 
 // Create axios instance with base configuration

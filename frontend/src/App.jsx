@@ -6,10 +6,10 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/" element={<LoginPage />} />
         <Route path="/auth/signup" element={<SignupPage />} />
-        <Route path="/" element={<div>User Dashboard (To be built)</div>} />
-        <Route path="*" element={<div>User Dashboard (To be built)</div>} />
+        {/* <Route path="/" element={<div>User Dashboard (To be built)</div>} />
+        <Route path="*" element={<div>User Dashboard (To be built)</div>} /> */}
       </Routes>
     </Router>
   );

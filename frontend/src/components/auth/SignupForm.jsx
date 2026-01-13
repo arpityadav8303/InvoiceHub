@@ -232,10 +232,9 @@ function SignupForm() {
           onChange={handleInputChange}
           className={`
             w-full px-4 py-2 border rounded-lg outline-none transition
-            ${
-              validationErrors.businessType
-                ? 'border-red-500 bg-red-50 focus:ring-2 focus:ring-red-500'
-                : 'border-gray-300 focus:ring-2 focus:ring-blue-500'
+            ${validationErrors.businessType
+              ? 'border-red-500 bg-red-50 focus:ring-2 focus:ring-red-500'
+              : 'border-gray-300 focus:ring-2 focus:ring-blue-500'
             }
           `}
         >
@@ -263,7 +262,7 @@ function SignupForm() {
       <p className="text-center text-gray-600 mt-4">
         Already have an account?{' '}
         <a
-          href="/auth/login"
+          href="/"
           className="text-blue-600 hover:text-blue-800 font-medium"
         >
           Login

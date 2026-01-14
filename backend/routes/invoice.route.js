@@ -6,11 +6,11 @@ import rateLimiter from '../middleware/rate-limitor.js'
 
 const router = express.Router()
 
-router.post('/', rateLimiter({ limit: 5, windowMinutes: 60 }), protect, validate(invoiceCreateSchema), createInvoice)
-router.get('/', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, getInvoices)
-router.get('/:id', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, getInvoiceById)
-router.put('/:id', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, validate(invoiceUpdateSchema), updateInvoice)
-router.delete('/:id', rateLimiter({ limit: 10, windowMinutes: 60 }), protect, deleteInvoice)
+router.post('/', rateLimiter({ limit: 50, windowMinutes: 15 }), protect, validate(invoiceCreateSchema), createInvoice)
+router.get('/', rateLimiter({ limit: 100, windowMinutes: 15 }), protect, getInvoices)
+router.get('/:id', rateLimiter({ limit: 100, windowMinutes: 15 }), protect, getInvoiceById)
+router.put('/:id', rateLimiter({ limit: 50, windowMinutes: 15 }), protect, validate(invoiceUpdateSchema), updateInvoice)
+router.delete('/:id', rateLimiter({ limit: 50, windowMinutes: 15 }), protect, deleteInvoice)
 
 export default router
 

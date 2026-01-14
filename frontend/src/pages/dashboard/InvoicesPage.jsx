@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAllInvoices } from '../../services/invoiceService';
 import { FileText, Plus, Edit, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const InvoicesPage = () => {
     const [invoices, setInvoices] = useState([]);
@@ -9,6 +10,7 @@ const InvoicesPage = () => {
     useEffect(() => {
         fetchInvoices();
     }, []);
+    const navigate = useNavigate();
 
     const fetchInvoices = async () => {
         try {
@@ -32,7 +34,9 @@ const InvoicesPage = () => {
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                     <FileText className="text-blue-600" /> Invoices
                 </h1>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition">
+                <button
+                    onClick={() => navigate('/invoices/create')} // Navigate to create route
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition">
                     <Plus size={20} /> Create Invoice
                 </button>
             </div>

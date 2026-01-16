@@ -1,31 +1,27 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-const Modal = ({
-  isOpen,
-  onClose,
-  title,
-  children,
-  footer,
-  size = 'md',
-  closeOnOverlayClick = true
+const Modal = ({ 
+  isOpen,       
+  onClose,      
+  title,        
+  children,     
+  footer,       
+  size = 'md'   
 }) => {
-  const modalRef = useRef(null);
 
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
     };
 
     if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden'; // Prevent background scrolling
     }
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
   }, [isOpen, onClose]);
@@ -33,56 +29,51 @@ const Modal = ({
   if (!isOpen) return null;
 
   const sizeClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    '2xl': 'max-w-2xl',
-    full: 'max-w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]'
-  };
-
-  const handleOverlayClick = (e) => {
-    if (closeOnOverlayClick && e.target === e.currentTarget) {
-      onClose();
-    }
+    sm: 'max-w-sm',      
+    md: 'max-w-md',      
+    lg: 'max-w-lg',      
+    xl: 'max-w-xl',      
+    full: 'w-full h-full m-4' 
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity"
-      onClick={handleOverlayClick}
-      aria-modal="true"
-      role="dialog"
+    // OVERLAY: Added 'backdrop-blur-sm' for modern glass effect
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 transition-opacity"
+      onClick={onClose} 
     >
-      <div
-        ref={modalRef}
-        className={`relative w-full ${sizeClasses[size] || sizeClasses.md} bg-white dark:bg-gray-800 rounded-xl shadow-2xl flex flex-col max-h-[90vh] transition-all transform animate-in fade-in zoom-in-95 duration-200`}
+      
+      {/* MODAL CONTAINER */}
+      <div 
+        className={`bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${sizeClasses[size]}`}
+        onClick={(e) => e.stopPropagation()} 
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 px-6 border-b border-gray-100 dark:border-gray-700">
+        
+        {/* HEADER: Clean border with subtle colors */}
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {title}
           </h3>
-          <button
+          <button 
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-            aria-label="Close modal"
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors dark:hover:bg-gray-700 dark:hover:text-gray-300"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Content */}
+        {/* BODY: Custom scrollbar support */}
         <div className="p-6 overflow-y-auto custom-scrollbar">
           {children}
         </div>
 
-        {/* Footer */}
+        {/* FOOTER: Distinct background for action area */}
         {footer && (
-          <div className="p-4 px-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl flex justify-end gap-3 transition-colors">
+          <div className="p-4 px-6 border-t border-gray-100 bg-gray-50 dark:bg-gray-800/50 dark:border-gray-700 rounded-b-xl flex justify-end gap-3">
             {footer}
           </div>
         )}
+
       </div>
     </div>
   );

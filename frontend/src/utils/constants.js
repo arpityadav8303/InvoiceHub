@@ -1,3 +1,13 @@
+export const APP_CONFIG = {
+  CURRENCY: 'INR',
+  LOCALE: 'en-IN',
+};
+
+export const PATTERNS = {
+  EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  PHONE: /^\d{10}$/,
+};
+
 export const API_ENDPOINTS = {
   LOGIN: '/auth/login',
   LOGIN_CLIENT: '/auth/loginClient',

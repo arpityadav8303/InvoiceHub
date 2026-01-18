@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { loginUser, registerUser, logoutUser, getCurrentUser } from '../services/authService';
 import { AuthContext } from './AuthContextType';
+
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
 
 
 

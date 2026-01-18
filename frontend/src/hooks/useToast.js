@@ -5,7 +5,7 @@ import { ToastContext } from '../context/ToastContext';
 // const { showToast } = useToast();
 // showToast('Invoice Saved!', 'success');
 
-export default function useToast() {
+export function useToast() {
   const context = useContext(ToastContext);
 
   if (!context) {

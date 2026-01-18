@@ -1,8 +1,19 @@
 import React from 'react';
+import Badge from '../common/Badge';
 
-const InvoiceStatusBadge = () => {
+const InvoiceStatusBadge = ({ status }) => {
+  const variants = {
+    Paid: 'success',
+    Pending: 'warning',
+    Overdue: 'danger',
+    Draft: 'neutral',
+    Cancelled: 'neutral'
+  };
+
   return (
-    <div>InvoiceStatusBadge</div>
+    <Badge variant={variants[status] || 'neutral'}>
+      {status}
+    </Badge>
   );
 };
 

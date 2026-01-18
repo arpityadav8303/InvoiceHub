@@ -4,28 +4,20 @@ import FormInput from './FormInput';
 import PasswordInput from './PasswordInput';
 import FormButton from './FormButton';
 import FormErrorMessage from './FormErrorMessage';
-import { loginUser, loginClient, saveToken } from '../../services/authService';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../../utils/constants';
+import { useAuth } from '../../context/AuthContext';
+import { ERROR_MESSAGES } from '../../utils/constants';
 
 function LoginForm() {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  // Form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [userType, setUserType] = useState('user'); // 'user' or 'client'
-
-  // Loading and error state
+  const [userType, setUserType] = useState('user');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Validation errors
   const [validationErrors, setValidationErrors] = useState({});
 
-  /**
-   * Validate form fields
-   * @returns {boolean} - True if valid, false otherwise
-   */
   const validateForm = () => {
     const errors = {};
 
@@ -43,16 +35,10 @@ function LoginForm() {
     return Object.keys(errors).length === 0;
   };
 
-  /**
-   * Handle form submission
-   */
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Clear previous errors
     setError('');
 
-    // Validate form
     if (!validateForm()) {
       return;
     }
@@ -60,38 +46,15 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      let response;
-
-      // Call appropriate login function based on user type
+      await login(email, password);
+      
+      // Navigate based on user type
       if (userType === 'user') {
-        response = await loginUser(email, password);
+        navigate('/dashboard/user', { replace: true });
       } else {
-        response = await loginClient(email, password);
-      }
-
-      // Check if login was successful
-      if (response.success) {
-        // Save token to localStorage
-        saveToken(response.token);
-
-        // Save user data (optional - can use Redux later)
-        localStorage.setItem('userData', JSON.stringify(response.user));
-        localStorage.setItem('userType', userType);
-
-        // Show success message (optional - use toast later)
-        console.log(SUCCESS_MESSAGES.LOGIN_SUCCESS);
-
-        // Navigate to appropriate dashboard
-        if (userType === 'user') {
-          navigate('/dashboard/user', { replace: true });
-        } else {
-          navigate('/dashboard/client', { replace: true });
-        }
-      } else {
-        setError(response.message || ERROR_MESSAGES.LOGIN_FAILED);
+        navigate('/dashboard/client', { replace: true });
       }
     } catch (err) {
-      // Handle error
       setError(err.message || ERROR_MESSAGES.LOGIN_FAILED);
       console.error('Login error:', err);
     } finally {
@@ -101,10 +64,6 @@ function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-md">
-      {/* Heading */}
-      <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Login</h2>
-
-      {/* Error Alert */}
       {error && (
         <FormErrorMessage
           message={error}
@@ -112,13 +71,11 @@ function LoginForm() {
         />
       )}
 
-      {/* User Type Selection */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
         <label className="block text-sm font-medium text-gray-700 mb-3">
           Login as:
         </label>
         <div className="flex gap-4">
-          {/* Business Owner Option */}
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="radio"
@@ -131,7 +88,6 @@ function LoginForm() {
             <span className="text-gray-700">Business Owner</span>
           </label>
 
-          {/* Client Option */}
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="radio"
@@ -146,7 +102,6 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* Email Input */}
       <FormInput
         label="Email Address"
         type="email"
@@ -158,7 +113,6 @@ function LoginForm() {
         name="email"
       />
 
-      {/* Password Input */}
       <PasswordInput
         label="Password"
         placeholder="Enter your password"
@@ -169,7 +123,6 @@ function LoginForm() {
         name="password"
       />
 
-      {/* Submit Button */}
       <FormButton
         text="Login"
         loading={loading}
@@ -177,7 +130,6 @@ function LoginForm() {
         type="submit"
       />
 
-      {/* Sign Up Link */}
       <p className="text-center text-gray-600 mt-4">
         Don't have an account?{' '}
         <a

@@ -1,36 +1,35 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { loginUser, registerUser, logoutUser, getCurrentUser } from '../services/authService';
-import { AuthContext } from './AuthContextType';
+import React, { useState, useEffect, useContext, createContext } from 'react';
+import { loginUser as apiLoginUser, registerUser as apiRegisterUser, logoutUser as apiLogoutUser } from '../services/authService';
+
+const AuthContext = createContext(null);
 
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
 };
-
-
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // Initial loading check
+  const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // 1. Check for existing session on Mount
   useEffect(() => {
-    const initAuth = async () => {
+    const initAuth = () => {
       try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          // Verify token and get user data
-          // Note: If you don't have a /me endpoint yet, you can decode the JWT
-          // For now, we'll try to fetch the user if a token exists
-          const userData = await getCurrentUser();
-          if (userData) {
-            setUser(userData);
-            setIsAuthenticated(true);
-          }
+        const token = localStorage.getItem('authToken');
+        const userData = localStorage.getItem('userData');
+        
+        if (token && userData) {
+          setUser(JSON.parse(userData));
+          setIsAuthenticated(true);
         }
       } catch (error) {
-        console.error("Session expired or invalid", error);
-        localStorage.removeItem('token');
+        console.error("Session initialization error", error);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userData');
       } finally {
         setLoading(false);
       }
@@ -39,28 +38,28 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  // 2. Login Action
-  const login = async (credentials) => {
-    const data = await loginUser(credentials);
-    localStorage.setItem('token', data.token); // Save token
+  const login = async (email, password) => {
+    const data = await apiLoginUser(email, password);
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('userData', JSON.stringify(data.user));
     setUser(data.user);
     setIsAuthenticated(true);
     return data;
   };
 
-  // 3. Register Action
   const register = async (userData) => {
-    const data = await registerUser(userData);
-    localStorage.setItem('token', data.token);
+    const data = await apiRegisterUser(userData);
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('userData', JSON.stringify(data.user));
     setUser(data.user);
     setIsAuthenticated(true);
     return data;
   };
 
-  // 4. Logout Action
   const logout = () => {
-    logoutUser(); // Call API to clear cookies if needed
-    localStorage.removeItem('token'); // Clear local storage
+    apiLogoutUser();
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userData');
     setUser(null);
     setIsAuthenticated(false);
   };

@@ -4,13 +4,13 @@ import FormInput from './FormInput';
 import PasswordInput from './PasswordInput';
 import FormButton from './FormButton';
 import FormErrorMessage from './FormErrorMessage';
-import { registerUser, saveToken } from '../../services/authService';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES, BUSINESS_TYPES } from '../../utils/constants';
+import { useAuth } from '../../context/AuthContext';
+import { ERROR_MESSAGES, BUSINESS_TYPES } from '../../utils/constants';
 
 function SignupForm() {
   const navigate = useNavigate();
+  const { register } = useAuth();
 
-  // Form state
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -21,23 +21,16 @@ function SignupForm() {
     businessType: 'freelancer',
   });
 
-  // Loading and error state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Validation errors
   const [validationErrors, setValidationErrors] = useState({});
 
-  /**
-   * Handle input change
-   */
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
-    // Clear error for this field when user starts typing
     if (validationErrors[name]) {
       setValidationErrors((prev) => ({
         ...prev,
@@ -46,10 +39,6 @@ function SignupForm() {
     }
   };
 
-  /**
-   * Validate form fields
-   * @returns {boolean} - True if valid, false otherwise
-   */
   const validateForm = () => {
     const errors = {};
 
@@ -91,16 +80,10 @@ function SignupForm() {
     return Object.keys(errors).length === 0;
   };
 
-  /**
-   * Handle form submission
-   */
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Clear previous errors
     setError('');
 
-    // Validate form
     if (!validateForm()) {
       return;
     }
@@ -108,28 +91,9 @@ function SignupForm() {
     setLoading(true);
 
     try {
-      // Call register API
-      const response = await registerUser(formData);
-
-      // Check if signup was successful
-      if (response.success) {
-        // Save token to localStorage
-        saveToken(response.token);
-
-        // Save user data
-        localStorage.setItem('userData', JSON.stringify(response.user));
-        localStorage.setItem('userType', 'user');
-
-        // Show success message
-        console.log(SUCCESS_MESSAGES.SIGNUP_SUCCESS);
-
-        // Navigate to user dashboard
-        navigate('/dashboard/user', { replace: true });
-      } else {
-        setError(response.message || ERROR_MESSAGES.REGISTRATION_FAILED);
-      }
+      await register(formData);
+      navigate('/dashboard/user', { replace: true });
     } catch (err) {
-      // Handle error
       setError(err.message || ERROR_MESSAGES.REGISTRATION_FAILED);
       console.error('Signup error:', err);
     } finally {
@@ -139,10 +103,6 @@ function SignupForm() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-md">
-      {/* Heading */}
-      <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Create Account</h2>
-
-      {/* Error Alert */}
       {error && (
         <FormErrorMessage
           message={error}
@@ -150,7 +110,6 @@ function SignupForm() {
         />
       )}
 
-      {/* First Name */}
       <FormInput
         label="First Name"
         type="text"
@@ -162,7 +121,6 @@ function SignupForm() {
         name="firstName"
       />
 
-      {/* Last Name */}
       <FormInput
         label="Last Name"
         type="text"
@@ -174,7 +132,6 @@ function SignupForm() {
         name="lastName"
       />
 
-      {/* Email */}
       <FormInput
         label="Email Address"
         type="email"
@@ -186,7 +143,6 @@ function SignupForm() {
         name="email"
       />
 
-      {/* Password */}
       <PasswordInput
         label="Password"
         placeholder="At least 6 characters"
@@ -197,7 +153,6 @@ function SignupForm() {
         name="password"
       />
 
-      {/* Business Name */}
       <FormInput
         label="Business Name"
         type="text"
@@ -209,7 +164,6 @@ function SignupForm() {
         name="businessName"
       />
 
-      {/* Phone */}
       <FormInput
         label="Phone Number"
         type="tel"
@@ -221,7 +175,6 @@ function SignupForm() {
         name="phone"
       />
 
-      {/* Business Type */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Business Type <span className="text-red-500">*</span>
@@ -250,7 +203,6 @@ function SignupForm() {
         )}
       </div>
 
-      {/* Submit Button */}
       <FormButton
         text="Create Account"
         loading={loading}
@@ -258,11 +210,10 @@ function SignupForm() {
         type="submit"
       />
 
-      {/* Login Link */}
       <p className="text-center text-gray-600 mt-4">
         Already have an account?{' '}
         <a
-          href="/"
+          href="/auth/login"
           className="text-blue-600 hover:text-blue-800 font-medium"
         >
           Login

@@ -292,4 +292,16 @@ const logoutUser = (req, res) => {
     message: 'Logged out successfully'
   });
 }
-export { registerUser, loginUser, logoutUser, loginClient, updateClientPassword }
+
+ const getMe = async (req, res, next) => {
+  try {
+    const user = req.user; // The 'protect' middleware already attached the user to req
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+export { registerUser, loginUser, logoutUser, loginClient, updateClientPassword,getMe }

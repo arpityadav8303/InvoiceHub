@@ -43,7 +43,7 @@ export const getClientDashboardOverview = async (req, res) => {
           },
           totalAmount: {
             label: 'Total Amount',
-            value: `$${stats.totalAmount.toLocaleString('en-US', {
+            value: `₹${stats.totalAmount.toLocaleString('en-US', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2
             })}`,
@@ -51,7 +51,7 @@ export const getClientDashboardOverview = async (req, res) => {
           },
           amountPaid: {
             label: 'Amount Paid',
-            value: `$${stats.amountPaid.toLocaleString('en-US', {
+            value: `₹${stats.amountPaid.toLocaleString('en-US', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2
             })}`,
@@ -59,7 +59,7 @@ export const getClientDashboardOverview = async (req, res) => {
           },
           amountOutstanding: {
             label: 'Outstanding',
-            value: `$${stats.amountOutstanding.toLocaleString('en-US', {
+            value: `₹${stats.amountOutstanding.toLocaleString('en-US', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2
             })}`,

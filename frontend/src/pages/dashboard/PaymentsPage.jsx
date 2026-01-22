@@ -58,7 +58,7 @@ const PaymentsPage = () => {
                                     </td>
                                     <td className="p-4 font-medium text-gray-900">{payment.client?.name || 'N/A'}</td>
                                     <td className="p-4 text-gray-600">{payment.invoiceNumber || '-'}</td>
-                                    <td className="p-4 font-bold text-green-600">+${payment.amount}</td>
+                                    <td className="p-4 font-bold text-green-600">+₹{payment.amount}</td>
                                     <td className="p-4 text-gray-600 capitalize">{payment.method}</td>
                                 </tr>
                             ))

@@ -103,54 +103,11 @@ const recordPayment = async (req, res) => {
     const newReliabilityScore =
       totalPayments > 0
         ? Math.round(
-            (updatedClient.paymentStats.onTimePayments / totalPayments) * 100
-          )
+          (updatedClient.paymentStats.onTimePayments / totalPayments) * 100
+        )
         : 0;
 
-    // Step 7: Send Payment Confirmation Email with PDF
-    try {
-      console.log('📧 Generating payment confirmation email and PDF...');
-      pdfPath = await generateInvoicePDF(invoice, client, user, newPayment);
-      console.log(`✅ PDF generated at: ${pdfPath}`);
-
-      const emailContent = await generatePaymentConfirmationEmailSmart(
-        newPayment,
-        invoice,
-        client,
-        user
-      );
-
-      const emailAttachments = [
-        {
-          filename: `Invoice_${invoice.invoiceNumber}.pdf`,
-          path: pdfPath
-        }
-      ];
-
-      await sendEmail(
-        client.email,
-        emailContent.subject,
-        emailContent.body_html,
-        emailAttachments
-      );
-
-      console.log(`✅ Payment confirmation email sent to ${client.email}`);
-    } catch (emailError) {
-      console.error(`⚠️ Failed to send payment confirmation email: ${emailError.message}`);
-    } finally {
-      if (pdfPath) {
-        try {
-          const deleted = await deletePDF(pdfPath);
-          if (deleted) {
-            console.log(`✅ Temporary PDF successfully cleaned up: ${pdfPath}`);
-          }
-        } catch (cleanupError) {
-          console.error(`⚠️ Failed to cleanup PDF: ${cleanupError.message}`);
-        }
-      }
-    }
-
-    // Step 8: Return success response
+    // Step 7: Send Response FIRST (Optimization for UI timeout)
     res.status(201).json({
       success: true,
       message: 'Payment recorded successfully',
@@ -179,22 +136,61 @@ const recordPayment = async (req, res) => {
         latePayments: updatedClient.paymentStats.latePayments
       },
       email: {
-        sent: true,
+        sent: 'processing',
         to: client.email,
-        note: 'Payment confirmation email with invoice PDF has been sent to the client'
+        note: 'Payment confirmation email will be sent in the background'
       }
     });
+
+    // Step 8: Send Email in Background (Non-blocking)
+    (async () => {
+      try {
+        console.log('📧 Generating payment confirmation email and PDF (Background Job)...');
+        const pdfPath = await generateInvoicePDF(invoice, client, user, newPayment);
+        console.log(`✅ PDF generated at: ${pdfPath}`);
+
+        const emailContent = await generatePaymentConfirmationEmailSmart(
+          newPayment,
+          invoice,
+          client,
+          user
+        );
+
+        const emailAttachments = [
+          {
+            filename: `Invoice_${invoice.invoiceNumber}.pdf`,
+            path: pdfPath
+          }
+        ];
+
+        await sendEmail(
+          client.email,
+          emailContent.subject,
+          emailContent.body_html,
+          emailAttachments
+        );
+
+        console.log(`✅ Payment confirmation email sent to ${client.email}`);
+
+        // Cleanup PDF
+        if (pdfPath) {
+          try {
+            const deleted = await deletePDF(pdfPath);
+            if (deleted) {
+              console.log(`✅ Temporary PDF successfully cleaned up: ${pdfPath}`);
+            }
+          } catch (cleanupError) {
+            console.error(`⚠️ Failed to cleanup PDF: ${cleanupError.message}`);
+          }
+        }
+      } catch (backgroundError) {
+        console.error(`⚠️ Background Email Error: ${backgroundError.message}`);
+        // Consider logging to a dedicated error monitoring service here
+      }
+    })();
+
   } catch (error) {
     console.error('Record payment error:', error);
-
-    if (pdfPath) {
-      try {
-        await deletePDF(pdfPath);
-      } catch (cleanupError) {
-        console.error(`Failed to cleanup PDF on error: ${cleanupError.message}`);
-      }
-    }
-
     res.status(500).json({
       success: false,
       message: 'Error recording payment',
@@ -251,21 +247,21 @@ const getPaymentsById = async (req, res) => {
   try {
     const { id } = req.params;
     const payment = await Payment.findById(id);
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
         message: 'Payment not found'
       })
     }
-    
+
     if (payment.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to access this payment'
       })
     }
-    
+
     return res.status(200).json({
       success: true,
       message: 'Payment fetched successfully',
@@ -321,8 +317,8 @@ const deletePayment = async (req, res) => {
       // If no money is left, clear payment fields
       paidAt: newPaidAmount === 0 ? null : invoice.paidAt,
       paymentMethod: newPaidAmount === 0 ? null : invoice.paymentMethod,
-      $pull: { 
-        paymentHistory: { transactionId: payment.transactionId } 
+      $pull: {
+        paymentHistory: { transactionId: payment.transactionId }
       }
     });
 

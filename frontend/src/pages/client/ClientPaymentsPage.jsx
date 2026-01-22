@@ -23,21 +23,47 @@ const ClientPaymentsPage = () => {
     const fetchData = React.useCallback(async () => {
         setLoading(true);
         try {
+            // FIXED: Try fetching without filter first to see all invoices
+
+
             const [invoicesRes, paymentsRes] = await Promise.all([
-                getMyInvoices({ status: 'sent,partially_paid,overdue', limit: 100 }),
+                // Try without status filter first, then we'll filter on frontend
+                getMyInvoices({ limit: 100 }),
                 getMyPayments()
             ]);
 
+
+
             if (invoicesRes.success) {
-                console.log('API Response Invoices:', invoicesRes.data.invoices);
-                setInvoices(invoicesRes.data.invoices);
+                const allInvoices = invoicesRes.data.invoices || [];
+
+
+                // Filter on frontend for unpaid/partially paid invoices
+                const unpaidInvoices = allInvoices.filter(inv => {
+                    const status = inv.status?.toLowerCase();
+                    const hasBalance = inv.remainingAmount > 0;
+
+
+                    return hasBalance && (
+                        status === 'sent' ||
+                        status === 'partially_paid' ||
+                        status === 'overdue' ||
+                        status === 'draft'
+                    );
+                });
+
+
+                setInvoices(unpaidInvoices);
+            } else {
+                console.error('❌ Failed to fetch invoices:', invoicesRes.message);
+                showToast('Failed to load invoices', 'error');
             }
 
             if (paymentsRes.success) {
-                setPayments(paymentsRes.data.payments);
+                setPayments(paymentsRes.data.payments || []);
             }
         } catch (err) {
-            console.error(err);
+            console.error('❌ Fetch error:', err);
             showToast('Failed to load payment data', 'error');
         } finally {
             setLoading(false);
@@ -49,6 +75,7 @@ const ClientPaymentsPage = () => {
     }, [fetchData]);
 
     const handlePayClick = (invoice) => {
+
         setSelectedInvoice(invoice);
         setPaymentAmount(invoice.remainingAmount);
         setPaymentMethod('bank_transfer');
@@ -59,22 +86,29 @@ const ClientPaymentsPage = () => {
         e.preventDefault();
 
         if (!selectedInvoice) return;
-        if (parseFloat(paymentAmount) <= 0 || parseFloat(paymentAmount) > selectedInvoice.remainingAmount + 0.01) {
+
+        const amount = parseFloat(paymentAmount);
+        const maxAmount = parseFloat(selectedInvoice.remainingAmount);
+
+
+
+        if (amount <= 0 || amount > maxAmount + 0.01) {
             showToast('Invalid payment amount', 'error');
             return;
         }
 
         setIsSubmitting(true);
         try {
-            // Mock Payment Payload
             const payload = {
                 invoiceId: selectedInvoice._id,
-                amount: parseFloat(paymentAmount),
+                amount: amount,
                 paymentMethod: paymentMethod,
                 paymentDate: new Date(),
-                notes: 'Client Portal Payment (Mock)',
-                referenceNumber: `MOCK-${Date.now()}`
+                notes: 'Client Portal Payment',
+                referenceNumber: `PAY-${Date.now()}`
             };
+
+
 
             const res = await recordPayment(payload);
 
@@ -86,7 +120,7 @@ const ClientPaymentsPage = () => {
                 showToast(res.message || 'Payment failed', 'error');
             }
         } catch (err) {
-            console.error(err);
+            console.error('❌ Payment error:', err);
             showToast(err.message || 'Payment failed', 'error');
         } finally {
             setIsSubmitting(false);
@@ -103,6 +137,8 @@ const ClientPaymentsPage = () => {
                 <p className="text-gray-500">Manage your payments and view history</p>
             </div>
 
+
+
             {/* Tabs */}
             <div className="flex border-b border-gray-200">
                 <button
@@ -110,7 +146,7 @@ const ClientPaymentsPage = () => {
                     className={`px-6 py-3 font-medium text-sm transition-colors relative ${activeTab === 'pending' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
-                    Pending Invoices
+                    Pending Invoices ({invoices.length})
                     {activeTab === 'pending' && (
                         <Motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
                     )}
@@ -148,7 +184,9 @@ const ClientPaymentsPage = () => {
                                                 <p className="text-sm text-gray-500">Invoice #</p>
                                                 <p className="font-semibold text-gray-900">{inv.invoiceNumber}</p>
                                             </div>
-                                            <span className={`px-2 py-1 rounded text-xs font-medium capitalize ${inv.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                                            <span className={`px-2 py-1 rounded text-xs font-medium capitalize ${inv.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                                                inv.status === 'partially_paid' ? 'bg-blue-100 text-blue-700' :
+                                                    'bg-yellow-100 text-yellow-700'
                                                 }`}>
                                                 {inv.status.replace('_', ' ')}
                                             </span>
@@ -161,11 +199,11 @@ const ClientPaymentsPage = () => {
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-500">Remaining</span>
-                                                <span className="font-bold text-gray-900">${inv.remainingAmount.toFixed(2)}</span>
+                                                <span className="font-bold text-gray-900">₹{inv.remainingAmount.toFixed(2)}</span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-500">Total</span>
-                                                <span>${inv.total.toFixed(2)}</span>
+                                                <span>₹{inv.total.toFixed(2)}</span>
                                             </div>
                                         </div>
 
@@ -207,7 +245,7 @@ const ClientPaymentsPage = () => {
                                                     {new Date(pay.paymentDate).toLocaleDateString()}
                                                 </td>
                                                 <td className="px-6 py-4 font-medium text-gray-900">
-                                                    ${pay.amount.toFixed(2)}
+                                                    ₹{pay.amount.toFixed(2)}
                                                 </td>
                                                 <td className="px-6 py-4 capitalize text-gray-600">
                                                     {pay.paymentMethod.replace('_', ' ')}
@@ -255,7 +293,7 @@ const ClientPaymentsPage = () => {
                                     <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                                     <div className="text-sm text-blue-800">
                                         <p className="font-medium">Invoice #{selectedInvoice.invoiceNumber}</p>
-                                        <p>Remaining Balance: <span className="font-bold">${selectedInvoice.remainingAmount.toFixed(2)}</span></p>
+                                        <p>Remaining Balance: <span className="font-bold">₹{selectedInvoice.remainingAmount.toFixed(2)}</span></p>
                                     </div>
                                 </div>
 
@@ -264,7 +302,7 @@ const ClientPaymentsPage = () => {
                                         Payment Amount
                                     </label>
                                     <div className="relative">
-                                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">₹</span>
                                         <input
                                             type="number"
                                             value={paymentAmount}
@@ -275,7 +313,7 @@ const ClientPaymentsPage = () => {
                                             required
                                         />
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1">This is a mock payment simulation.</p>
+                                    <p className="text-xs text-gray-500 mt-1">Payment will be processed and receipt sent via email.</p>
                                 </div>
 
                                 <div>
@@ -301,7 +339,7 @@ const ClientPaymentsPage = () => {
                                         className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-lg shadow-blue-200 transition-all flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                                     >
                                         {isSubmitting ? (
-                                            <LoadingSpinner size="sm" color="white" />
+                                            <>Processing...</>
                                         ) : (
                                             <>
                                                 <Check size={18} />

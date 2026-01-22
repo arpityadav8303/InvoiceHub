@@ -34,7 +34,7 @@ const fields = {
   paymentMethod: () => Joi.string()
     .valid('bank_transfer', 'cheque', 'upi', 'card', 'cash')
     .messages(messages.paymentMethod),
-  paymentDate: () => Joi.date().max('now').messages(messages.paymentDate),
+  paymentDate: () => Joi.date().messages(messages.paymentDate),
   referenceNumber: () => Joi.string().trim().allow('', null),
   bankDetails: () => Joi.object({
     bankName: Joi.string().trim().optional(),

@@ -1,7 +1,7 @@
 import { paymentCreateSchema, paymentUpdateSchema } from '../validators/payment.validators.js'
 import express from 'express'
 import { protect, validate } from '../middleware/auth.middleware.js'
-import { recordPayment, getPayments, getPaymentsById, deletePayment } from '../controller/payment.controller.js'
+import { recordPayment, getPayments, getPaymentsById, deletePayment } from '../controller/payment.Controller.js'
 import rateLimiter from '../middleware/rate-limitor.js'
 const router = express.Router()
 

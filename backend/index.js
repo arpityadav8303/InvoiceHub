@@ -35,8 +35,12 @@ app.get("/", (req, res) => {
 //   credentials: true                 // if you use cookies or auth headers
 // }));
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*', // Allows any origin if FRONTEND_URL is not set
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: [
+    'http://localhost:5173',
+    'https://invoice-hub-rust.vercel.app', // Your Vercel frontend URL
+    process.env.FRONTEND_URL               // Allow environment variable override
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true
 }));
 

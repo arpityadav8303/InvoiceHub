@@ -29,10 +29,15 @@ app.get("/", (req, res) => {
   res.send("API is running...");
 });
 
+// app.use(cors({
+//   origin: 'http://localhost:5173',  // frontend URL
+//   methods: ['GET', 'POST', 'PUT', 'DELETE'],
+//   credentials: true                 // if you use cookies or auth headers
+// }));
 app.use(cors({
-  origin: 'http://localhost:5173',  // frontend URL
+  origin: process.env.FRONTEND_URL || '*', // Allows any origin if FRONTEND_URL is not set
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true                 // if you use cookies or auth headers
+  credentials: true
 }));
 
 app.use('/api/auth', authRoutes)

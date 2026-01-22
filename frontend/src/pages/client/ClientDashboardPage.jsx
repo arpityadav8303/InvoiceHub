@@ -90,11 +90,11 @@ const ClientDashboardPage = () => {
                                     <tr key={inv.invoiceNumber} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-200">{inv.invoiceNumber}</td>
                                         <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{new Date(inv.dueDate).toLocaleDateString()}</td>
-                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-200">${inv.amount}</td>
+                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-200">₹{inv.amount}</td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${inv.status === 'paid' ? 'bg-green-100 text-green-700' :
-                                                    inv.status === 'overdue' ? 'bg-red-100 text-red-700' :
-                                                        'bg-yellow-100 text-yellow-700'
+                                                inv.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                                                    'bg-yellow-100 text-yellow-700'
                                                 }`}>
                                                 {inv.status}
                                             </span>

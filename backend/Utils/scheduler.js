@@ -170,7 +170,7 @@ const logSchedulerCompletion = (startTime, successCount, failureCount) => {
 
 export const initScheduler = () => {
   try {
-    const scheduledTime = '0 9 * * *'; // 9:00 AM every day
+    const scheduledTime = '30 3 * * *'; // 3:30 AM UTC = 9:00 AM IST
 
     console.log('\n╔════════════════════════════════════════╗');
     console.log('║   📅 PAYMENT REMINDER SCHEDULER       ║');

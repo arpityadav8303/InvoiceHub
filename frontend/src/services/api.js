@@ -1,5 +1,13 @@
 import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL || '/api';
+  // If it's a full URL and doesn't end with /api, append it
+  if (envUrl.startsWith('http') && !envUrl.endsWith('/api')) {
+    return `${envUrl.replace(/\/$/, '')}/api`;
+  }
+  return envUrl;
+};
+const API_URL = getApiUrl();
 
 // Create axios instance with base configuration
 const api = axios.create({

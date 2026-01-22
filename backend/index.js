@@ -26,7 +26,7 @@ connectdb();
 initScheduler();
 
 app.get("/", (req, res) => {
-  res.send("API is running...");
+  res.send({ status: "API is running...", version: "1.0.1", deployedAt: new Date().toISOString() });
 });
 
 // app.use(cors({

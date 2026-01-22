@@ -5,7 +5,7 @@ import EmptyState from '../common/EmptyState';
 import { formatDate, formatCurrency } from '../../utils/formatters';
 
 const ClientPaymentHistory = ({ payments }) => {
-  
+
   if (!payments || payments.length === 0) {
     return (
       <EmptyState
@@ -19,7 +19,7 @@ const ClientPaymentHistory = ({ payments }) => {
     {
       header: 'Payment ID',
       accessor: 'id',
-      render: (pay) => <span className="font-mono text-xs text-gray-500">{pay.id.substring(0,8)}</span>
+      render: (pay) => <span className="font-mono text-xs text-gray-500">{(pay.id || pay._id || '').toString().substring(0, 8)}</span>
     },
     {
       header: 'Date',

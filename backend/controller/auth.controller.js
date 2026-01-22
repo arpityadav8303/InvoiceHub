@@ -2,17 +2,9 @@ import User from '../models/user.model.js'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
 import Client from '../models/client.model.js'
-import bcrypt from 'bcryptjs'
+// import bcrypt from 'bcryptjs' // Removed if not needed directly, handled by model usually
 
 dotenv.config()
-
-// const generateToken = (id) => {
-//   const expiresIn = process.env.JWT_EXPIRE || '7d'
-//   const token = jwt.sign({ id }, process.env.JWT_SECRET, {
-//     expiresIn: expiresIn
-//   })
-//   return token
-// }
 
 const generateToken = (id, model) => {
   const expiresIn = process.env.JWT_EXPIRE || '7d';
@@ -105,6 +97,7 @@ const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body
 
+    // Validation: Check if email and password are provided
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -112,6 +105,7 @@ const loginUser = async (req, res) => {
       })
     }
 
+    // Check if user exists
     const user = await User.findOne({ email }).select('+password')
 
     if (!user) {
@@ -121,28 +115,23 @@ const loginUser = async (req, res) => {
       })
     }
 
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: 'Account is deactivated'
-      })
-    }
+    // Check if password is correct
+    const isMatch = await user.comparePassword(password)
 
-    const isPasswordValid = await user.comparePassword(password)
-
-    if (!isPasswordValid) {
+    if (!isMatch) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       })
     }
 
+    // Generate JWT token
     const token = generateToken(user._id, 'user')
 
+    // Return response with user data (without password)
     res.status(200).json({
       success: true,
       message: 'Login successful',
-      token: token,
       user: {
         _id: user._id,
         firstName: user.firstName,
@@ -151,13 +140,14 @@ const loginUser = async (req, res) => {
         businessName: user.businessName,
         phone: user.phone,
         businessType: user.businessType
-      }
+      },
+      token: token
     })
   } catch (error) {
     console.error('Login error:', error)
     res.status(500).json({
       success: false,
-      message: 'Server error during login',
+      message: 'Error during login',
       error: error.message
     })
   }
@@ -223,8 +213,8 @@ const loginClient = async (req, res) => {
         businessType: client.businessType
       }
     });
-  }
-  catch (error) {
+
+  } catch (error) {
     console.error('Login error:', error)
     res.status(500).json({
       success: false,
@@ -236,55 +226,39 @@ const loginClient = async (req, res) => {
 
 const updateClientPassword = async (req, res) => {
   try {
-    const { oldPassword, newPassword } = req.body
+    const { currentPassword, newPassword } = req.body;
+    const clientId = req.client._id;
 
-    if (!oldPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide oldPassword and newPassword"
-      })
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Please provide both current and new passwords' });
     }
 
-    const client = await Client.findById(req.client._id).select('+password');
+    const client = await Client.findById(clientId).select('+password');
     if (!client) {
-      return res.status(404).json({
-        success: false,
-        message: "Client not found"
-      })
+      return res.status(404).json({ success: false, message: 'Client not found' });
     }
 
-    const isMatch = await bcrypt.compare(oldPassword, client.password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Old password is incorrect'
-      });
+    // Check if password exists (legacy support)
+    if (client.password) {
+      const isMatch = await client.comparePassword(currentPassword);
+      if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Incorrect current password' });
+      }
     }
 
-    client.password=newPassword
-
-
+    client.password = newPassword;
     await client.save();
 
     res.status(200).json({
       success: true,
-      message: "Password updated successfully"
-    })
-
-
-  }
-
-  catch (error) {
-    console.error('Update password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during password update',
-      error: error.message
+      message: 'Password updated successfully'
     });
+
+  } catch (error) {
+    console.error('Update Password Error:', error);
+    res.status(500).json({ success: false, message: 'Server error updating password' });
   }
-
-
-}
+};
 
 const logoutUser = (req, res) => {
   res.status(200).json({
@@ -293,9 +267,9 @@ const logoutUser = (req, res) => {
   });
 }
 
- const getMe = async (req, res, next) => {
+const getMe = async (req, res, next) => {
   try {
-    const user = req.user; // The 'protect' middleware already attached the user to req
+    const user = req.user || req.client; // Support both User and Client entities
     res.status(200).json({
       success: true,
       data: user
@@ -304,4 +278,5 @@ const logoutUser = (req, res) => {
     next(error);
   }
 };
-export { registerUser, loginUser, logoutUser, loginClient, updateClientPassword,getMe }
+
+export { registerUser, loginUser, logoutUser, loginClient, getMe, updateClientPassword };

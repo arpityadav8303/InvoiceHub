@@ -96,15 +96,14 @@ const registerSchema = Joi.object({
 });
 
 const loginSchema = Joi.object({
-    email: Joi.string()
-        .email()
-        .required()
-        .lowercase()
-        .trim(),
-    
-    password: Joi.string()
-      .min(6)
-      .required()
+  email: Joi.string()
+    .email()
+    .required()
+    .lowercase()
+    .trim(),
+
+  password: Joi.string()
+    .required()
 });
 
-export {registerSchema,loginSchema};
+export { registerSchema, loginSchema };

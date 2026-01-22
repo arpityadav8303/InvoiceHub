@@ -43,25 +43,25 @@ export const getClientDashboardOverview = async (req, res) => {
           },
           totalAmount: {
             label: 'Total Amount',
-            value: `$${stats.totalAmount.toLocaleString('en-US', { 
-              minimumFractionDigits: 2, 
-              maximumFractionDigits: 2 
+            value: `$${stats.totalAmount.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
             })}`,
             trend: 'neutral'
           },
           amountPaid: {
             label: 'Amount Paid',
-            value: `$${stats.amountPaid.toLocaleString('en-US', { 
-              minimumFractionDigits: 2, 
-              maximumFractionDigits: 2 
+            value: `$${stats.amountPaid.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
             })}`,
             trend: 'positive'
           },
           amountOutstanding: {
             label: 'Outstanding',
-            value: `$${stats.amountOutstanding.toLocaleString('en-US', { 
-              minimumFractionDigits: 2, 
-              maximumFractionDigits: 2 
+            value: `$${stats.amountOutstanding.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
             })}`,
             trend: stats.amountOutstanding === 0 ? 'positive' : 'warning'
           }
@@ -72,12 +72,12 @@ export const getClientDashboardOverview = async (req, res) => {
           collectionRate: {
             label: 'Your Payment Rate',
             percentage: stats.collectionRate,
-            status: stats.collectionRate >= 80 ? 'excellent' : 
-                   stats.collectionRate >= 60 ? 'good' : 
-                   stats.collectionRate >= 40 ? 'fair' : 'poor',
+            status: stats.collectionRate >= 80 ? 'excellent' :
+              stats.collectionRate >= 60 ? 'good' :
+                stats.collectionRate >= 40 ? 'fair' : 'poor',
             description: `${stats.collectionRate}% of invoices paid on time`
           },
-          
+
           invoiceStatus: {
             paid: {
               count: stats.paidCount,
@@ -181,16 +181,16 @@ function calculateStats(invoices, payments) {
   // Count by status
   const paidCount = invoices.filter(inv => inv.status === 'paid').length;
   const partiallyPaidCount = invoices.filter(inv => inv.status === 'partially_paid').length;
-  const unpaidCount = invoices.filter(inv => 
+  const unpaidCount = invoices.filter(inv =>
     inv.status === 'sent' || inv.status === 'draft'
   ).length;
 
   // Overdue invoices
-  const overdueInvoices = invoices.filter(inv => 
+  const overdueInvoices = invoices.filter(inv =>
     inv.dueDate && new Date(inv.dueDate) < now && inv.status !== 'paid'
   );
   const overdueCount = overdueInvoices.length;
-  const totalOverdue = overdueInvoices.reduce((sum, inv) => 
+  const totalOverdue = overdueInvoices.reduce((sum, inv) =>
     sum + (inv.remainingAmount || 0), 0
   );
 
@@ -209,17 +209,17 @@ function calculateStats(invoices, payments) {
   });
 
   // Collection rate
-  const collectionRate = totalAmount > 0 
+  const collectionRate = totalAmount > 0
     ? Math.round((amountPaid / totalAmount) * 100)
     : 0;
 
   // Recent invoices (sorted by date, newest first)
-  const recentInvoices = [...invoices].sort((a, b) => 
+  const recentInvoices = [...invoices].sort((a, b) =>
     new Date(b.invoiceDate) - new Date(a.invoiceDate)
   );
 
   // Recent payments (sorted by date, newest first)
-  const recentPayments = [...payments].sort((a, b) => 
+  const recentPayments = [...payments].sort((a, b) =>
     new Date(b.paymentDate) - new Date(a.paymentDate)
   );
 
@@ -235,12 +235,12 @@ function calculateStats(invoices, payments) {
     totalOverdue: parseFloat(totalOverdue.toFixed(2)),
     collectionRate,
     dueToday: {
-      total: parseFloat(dueToday.reduce((sum, inv) => 
+      total: parseFloat(dueToday.reduce((sum, inv) =>
         sum + (inv.remainingAmount || 0), 0).toFixed(2)),
       count: dueToday.length
     },
     dueThisWeek: {
-      total: parseFloat(dueThisWeek.reduce((sum, inv) => 
+      total: parseFloat(dueThisWeek.reduce((sum, inv) =>
         sum + (inv.remainingAmount || 0), 0).toFixed(2)),
       count: dueThisWeek.length
     },
@@ -255,10 +255,10 @@ function calculateStats(invoices, payments) {
 function calculateDaysUntilDue(dueDate) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const due = new Date(dueDate);
   due.setHours(0, 0, 0, 0);
-  
+
   const diffTime = due - today;
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
@@ -297,7 +297,7 @@ export const getInvoiceDetails = async (req, res) => {
         invoiceNumber: invoice.invoiceNumber,
         invoiceDate: invoice.invoiceDate,
         dueDate: invoice.dueDate,
-        
+
         // Items
         items: invoice.items.map(item => ({
           description: item.description,
@@ -384,6 +384,68 @@ export const downloadInvoicePDF = async (req, res) => {
   }
 };
 
+// ========== 2.1: FETCH ALL INVOICES ==========
+export const getClientInvoices = async (req, res) => {
+  try {
+    const clientId = req.client._id;
+    const { page = 1, limit = 10, status } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+
+    const query = { clientId };
+    if (status && status !== 'all') {
+      const statuses = status.split(',');
+      if (statuses.length > 1) {
+        query.status = { $in: statuses };
+      } else {
+        query.status = status;
+      }
+    }
+
+    // DIAGNOSTIC LOGS
+    const totalForClient = await Invoice.countDocuments({ clientId });
+    console.log(`[DEBUG] ClientId: ${clientId}`);
+    console.log(`[DEBUG] Total Invoices for Client: ${totalForClient}`);
+    console.log(`[DEBUG] Filter Query:`, JSON.stringify(query, null, 2));
+    const matchingCount = await Invoice.countDocuments(query);
+    console.log(`[DEBUG] Matching Invoices: ${matchingCount}`);
+
+    // Check if any invoices exist with these statuses but maybe case mismatch?
+    if (matchingCount === 0 && totalForClient > 0) {
+      const distinctStatuses = await Invoice.distinct('status', { clientId });
+      console.log(`[DEBUG] Actual Distinct Statuses for Client:`, distinctStatuses);
+    }
+    // END DIAGNOSTICS
+
+    const invoices = await Invoice.find(query)
+      .sort({ invoiceDate: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    const totalCount = await Invoice.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      message: 'Invoices fetched successfully',
+      data: {
+        invoices,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limitNum)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get Invoices Error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching invoices' });
+  }
+};
+
 // ========== 3.1: PAYMENT HISTORY ==========
 /**
  * Get Payment History
@@ -453,6 +515,7 @@ export const getClientProfile = async (req, res) => {
     const clientId = req.client._id;
 
     const client = await Client.findById(clientId)
+      .populate('userId', 'firstName lastName businessName email phone address')
       .select('-password')
       .lean();
 
@@ -463,10 +526,19 @@ export const getClientProfile = async (req, res) => {
       });
     }
 
+    const vendor = client.userId;
+
     res.status(200).json({
       success: true,
       message: 'Profile fetched successfully',
       data: {
+        vendorInfo: {
+          businessName: vendor?.businessName || 'N/A',
+          contactName: `${vendor?.firstName || ''} ${vendor?.lastName || ''}`.trim(),
+          email: vendor?.email,
+          phone: vendor?.phone,
+          address: vendor?.address
+        },
         personalInfo: {
           firstName: client.firstName,
           lastName: client.lastName,

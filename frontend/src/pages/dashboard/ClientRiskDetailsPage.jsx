@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 
@@ -11,62 +11,57 @@ import RiskAlerts from '../../components/risk/RiskAlerts';
 import Button from '../../components/common/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { useToast } from '../../hooks/useToast';
+import { getClientRiskAssessment } from '../../services/clientService';
 
 const ClientRiskDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  
+
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
 
-  // MOCK FETCH
-  useEffect(() => {
-    // Simulate API delay
-    setTimeout(() => {
-      setData({
-        clientName: 'Tech Solutions Inc.',
-        score: 78, // 0-100 (High Score = High Risk)
-        level: 'High',
-        lastUpdated: '2024-03-15',
-        alerts: [
-          'Client has 3 invoices overdue by 60+ days.',
-          'Credit utilization spiked by 40% in last month.'
-        ],
-        factors: [
-          { description: 'Consistent late payments (Avg 15 days late)', impact: 'negative', category: 'Payment History' },
-          { description: 'Declining revenue reported in public filings', impact: 'negative', category: 'Financial Health' },
-          { description: 'Long-term contract recently renewed', impact: 'positive', category: 'Relationship' },
-        ],
-        history: [
-          { month: 'Oct', score: 45 },
-          { month: 'Nov', score: 50 },
-          { month: 'Dec', score: 55 },
-          { month: 'Jan', score: 65 },
-          { month: 'Feb', score: 72 },
-          { month: 'Mar', score: 78 },
-        ],
-        recommendations: [
-          { title: 'Request Advance Payment', description: 'Due to high risk, request 50% upfront for next project.', action: 'Update Payment Terms' },
-          { title: 'Pause New Credit', description: 'Do not approve new credit limits until overdue invoices are cleared.', action: 'Freeze Credit' },
-        ]
-      });
+  const fetchRiskData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await getClientRiskAssessment(id);
+      if (res.success) {
+        setData(res.data);
+      }
+    } catch (error) {
+      console.error("Error fetching risk assessment:", error);
+      showToast(error.message || 'Failed to load risk assessment', 'error');
+    } finally {
       setLoading(false);
-    }, 1200);
-  }, [id]);
+    }
+  }, [id, showToast]);
+
+  useEffect(() => {
+    fetchRiskData();
+  }, [fetchRiskData]);
 
   const handleRefresh = () => {
-    setLoading(true);
+    fetchRiskData();
     showToast('Recalculating risk profile...', 'info');
-    // Re-fetch logic would go here
-    setTimeout(() => setLoading(false), 1500);
   };
 
   if (loading) return <LoadingSpinner fullScreen />;
+  if (!data) return <div className="p-8 text-center">Risk assessment not found</div>;
+
+  // Transform backend factors object to array for RiskFactorsList if needed, 
+  // or ensure RiskFactorsList can handle the object structure.
+  // Based on ClientDetailsPage, RiskFactorsList seems to expect an array.
+  // Let's create an adapter here similar to what we might need.
+  const riskFactorsArray = [
+    { description: 'Payment Reliability', impact: data.factors.paymentReliabilityScore.impact === 'High' ? 'positive' : 'negative', category: 'Score', ...data.factors.paymentReliabilityScore },
+    { description: `Average Days Overdue: ${data.factors.averageDaysOverdue.days}`, impact: data.factors.averageDaysOverdue.days > 0 ? 'negative' : 'positive', category: 'Payment', ...data.factors.averageDaysOverdue },
+    { description: `Recent Late Payments: ${data.factors.recentLatePayments.count}`, impact: data.factors.recentLatePayments.count > 0 ? 'negative' : 'positive', category: 'History', ...data.factors.recentLatePayments },
+    { description: `Payment Velocity: ${data.factors.paymentVelocity.velocity}`, impact: data.factors.paymentVelocity.status === 'Acceptable' ? 'positive' : 'negative', category: 'Trend', ...data.factors.paymentVelocity }
+  ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      
+
       {/* 1. Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div className="flex items-center gap-4">
@@ -82,12 +77,12 @@ const ClientRiskDetailsPage = () => {
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">Last updated: {data.lastUpdated}</span>
-            <Button variant="secondary" icon={RefreshCw} onClick={handleRefresh}>
-                Recalculate
-            </Button>
+          <span className="text-xs text-gray-500">Last updated: {new Date(data.riskSummary.lastAssessmentDate).toLocaleDateString()}</span>
+          <Button variant="secondary" icon={RefreshCw} onClick={handleRefresh}>
+            Recalculate
+          </Button>
         </div>
       </div>
 
@@ -100,13 +95,13 @@ const ClientRiskDetailsPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Left: Score Card */}
         <div className="lg:col-span-1">
-          <RiskScoreCard score={data.score} level={data.level} />
+          <RiskScoreCard score={data.riskSummary.riskScore} level={data.riskSummary.riskLevel} />
         </div>
 
         {/* Right: Trend Chart & Factors */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          <RiskTrendChart history={data.history} />
-          <RiskFactorsList factors={data.factors} />
+          <RiskTrendChart history={data.trendAnalysis.recentPerformance} /> {/* Check API mapping */}
+          <RiskFactorsList factors={riskFactorsArray} />
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, Download, ExternalLink } from 'lucide-react';
 
@@ -9,48 +9,45 @@ import Badge from '../../components/common/Badge';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import PaymentMethodBadge from '../../components/payment/PaymentMethodBadge';
 
+// Service
+import { getPaymentById } from '../../services/paymentService';
+
 // Utils
-import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters';
+import { formatCurrency, formatDateTime } from '../../utils/formatters';
 
 const PaymentDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(true);
   const [payment, setPayment] = useState(null);
 
-  // MOCK FETCH
-  useEffect(() => {
-    setTimeout(() => {
-      setPayment({
-        id: id,
-        amount: 5000.00,
-        date: '2024-03-15T14:30:00Z',
-        method: 'Bank Transfer',
-        status: 'Completed',
-        transactionId: 'TXN-88992211',
-        notes: 'Monthly retainer fee for March',
-        invoice: {
-          id: 'inv-123',
-          number: 'INV-2024-001',
-          total: 5000.00
-        },
-        client: {
-          id: 'cli-456',
-          name: 'Tech Solutions Inc.',
-          email: 'accounts@techsolutions.com'
-        }
-      });
+  // Fetch Payment Data
+  const fetchPayment = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await getPaymentById(id);
+      if (res.success) {
+        setPayment(res.data);
+      }
+    } catch (error) {
+      console.error("Error fetching payment details:", error);
+      // Optional: showToast('Failed to load payment details', 'error');
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   }, [id]);
+
+  useEffect(() => {
+    fetchPayment();
+  }, [fetchPayment]);
 
   if (loading) return <LoadingSpinner fullScreen />;
   if (!payment) return <div>Payment not found</div>;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      
+
       {/* 1. Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
@@ -78,7 +75,7 @@ const PaymentDetailsPage = () => {
         {/* Receipt Body */}
         <div className="p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            
+
             {/* Left Column */}
             <div className="space-y-4">
               <div>
@@ -112,10 +109,10 @@ const PaymentDetailsPage = () => {
                 <p className="text-xs text-gray-500 uppercase">Linked Invoice</p>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="font-medium">#{payment.invoice.number}</p>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    icon={ExternalLink} 
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={ExternalLink}
                     className="h-6 text-gray-400"
                     onClick={() => navigate(`/invoices/${payment.invoice.id}`)}
                   />

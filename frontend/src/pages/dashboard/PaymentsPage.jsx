@@ -27,7 +27,7 @@ const PaymentsPage = () => {
     if (loading) return <div className="p-8">Loading Payments...</div>;
 
     return (
-        <div className="ml-64 p-8 bg-gray-50 min-h-screen">
+        <div className="p-8 bg-gray-50 dark:bg-gray-900 h-full">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                     <CreditCard className="text-blue-600" /> Payments

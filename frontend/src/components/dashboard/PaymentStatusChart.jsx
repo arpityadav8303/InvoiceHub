@@ -11,8 +11,8 @@ const PaymentStatusChart = ({ stats }) => {
 
   return (
     <Card title="Invoice Status">
-      <div className="h-[300px] w-full relative">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="w-full relative" style={{ height: 300 }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
           <PieChart>
             <Pie
               data={data}
@@ -27,22 +27,22 @@ const PaymentStatusChart = ({ stats }) => {
                 <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
               ))}
             </Pie>
-            <Tooltip 
+            <Tooltip
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
             />
-            <Legend 
-              verticalAlign="bottom" 
-              height={36} 
+            <Legend
+              verticalAlign="bottom"
+              height={36}
               iconType="circle"
-              formatter={(value, entry) => <span className="text-sm font-medium text-gray-600 ml-1">{value}</span>}
+              formatter={(value, _) => <span className="text-sm font-medium text-gray-600 ml-1">{value}</span>}
             />
           </PieChart>
         </ResponsiveContainer>
-        
+
         {/* Center Text Overlay */}
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none pb-8">
-            <p className="text-xs text-gray-500 uppercase">Total</p>
-            <p className="text-2xl font-bold text-gray-900">20</p>
+          <p className="text-xs text-gray-500 uppercase">Total</p>
+          <p className="text-2xl font-bold text-gray-900">20</p>
         </div>
       </div>
     </Card>

@@ -4,16 +4,12 @@ import Card from '../common/Card';
 import Badge from '../common/Badge';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
-const UpcomingInvoices = () => {
-  const invoices = [
-    { id: 'INV-005', client: 'Alpha Industries', amount: 12000, dueDate: '2024-01-20' },
-    { id: 'INV-006', client: 'Beta Corp', amount: 8500, dueDate: '2024-01-22' },
-    { id: 'INV-007', client: 'Gamma Ltd', amount: 3400, dueDate: '2024-01-25' },
-  ];
+const UpcomingInvoices = ({ data }) => {
+  const invoices = data || [];
 
   return (
-    <Card 
-      title="Upcoming Due" 
+    <Card
+      title="Upcoming Due"
       action={
         <button className="text-xs text-blue-600 font-medium hover:underline flex items-center">
           View All <ChevronRight size={12} />

@@ -7,7 +7,7 @@ import { generateRandomPassword } from '../Utils/randomPassword.js'
 const createClient = async (req, res) => {
   try {
     const { firstName, lastName, email, phone, companyName, address, gstNumber, preferredPaymentMethod } = req.body
-    
+
     // Validation
     if (!firstName || !lastName || !email || !phone) {
       return res.status(400).json({
@@ -26,11 +26,19 @@ const createClient = async (req, res) => {
       })
     }
 
-    // Step 1: Generate random password
-    const generatedPassword = generateRandomPassword()
-    console.log(`🔐 Generated password for ${email}`)
+    // Step 1: Handle Password (Custom or Generated)
+    const { password } = req.body
+    let generatedPassword = "" // Variable to hold the raw password for email
 
-    // Step 2: Create new client with generated password
+    if (password && password.trim() !== "") {
+      generatedPassword = password
+      console.log(`🔐 Using provided password for ${email}`)
+    } else {
+      generatedPassword = generateRandomPassword()
+      console.log(`🔐 Generated password for ${email}`)
+    }
+
+    // Step 2: Create new client
     const newClient = await Client.create({
       userId: req.user._id,
       firstName,
@@ -183,69 +191,62 @@ const updateClient = async (req, res) => {
     const { id } = req.params
     const { firstName, lastName, email, phone, companyName, address, gstNumber, preferredPaymentMethod, riskLevel, status, portalAccess } = req.body
 
-    const client = await Client.findById(id)
+    // Find client and check ownership
+    const client = await Client.findOne({ _id: id, userId: req.user._id });
 
     if (!client) {
       return res.status(404).json({
         success: false,
-        message: 'Client not found'
-      })
+        message: 'Client not found or authorized'
+      });
     }
 
-    if (client.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this client'
-      })
-    }
-
-    if (email) {
+    // Email Uniqueness Check
+    if (email && email !== client.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(email)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please provide a valid email address'
-        })
+        return res.status(400).json({ success: false, message: 'Please provide a valid email address' })
       }
 
-      const existingEmail = await Client.findOne({ 
-        userId: req.user._id, 
+      const existingEmail = await Client.findOne({
+        userId: req.user._id,
         email: email,
         _id: { $ne: id }
       })
 
       if (existingEmail) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email already used by another client'
-        })
+        return res.status(400).json({ success: false, message: 'Email already used by another client' })
       }
+      client.email = email;
     }
 
     if (phone) {
       const phoneRegex = /^[6-9]\d{9}$/
       if (!phoneRegex.test(phone)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please provide a valid 10-digit phone number'
-        })
+        return res.status(400).json({ success: false, message: 'Invalid phone number' })
       }
+      client.phone = phone;
     }
 
-    const updateData = {}
-    if (firstName) updateData.firstName = firstName
-    if (lastName) updateData.lastName = lastName
-    if (email) updateData.email = email
-    if (phone) updateData.phone = phone
-    if (companyName) updateData.companyName = companyName
-    if (address) updateData.address = address
-    if (gstNumber) updateData.gstNumber = gstNumber
-    if (preferredPaymentMethod) updateData.preferredPaymentMethod = preferredPaymentMethod
-    if (riskLevel) updateData.riskLevel = riskLevel
-    if (status) updateData.status = status
-    if (portalAccess !== undefined) updateData.portalAccess = portalAccess
+    // Update other fields
+    if (firstName) client.firstName = firstName;
+    if (lastName) client.lastName = lastName;
+    // client.email handled above
+    // client.phone handled above
+    if (companyName) client.companyName = companyName;
+    if (address) client.address = address;
+    if (gstNumber) client.gstNumber = gstNumber;
+    if (preferredPaymentMethod) client.preferredPaymentMethod = preferredPaymentMethod;
+    if (riskLevel) client.riskLevel = riskLevel;
+    if (status) client.status = status;
+    if (portalAccess !== undefined) client.portalAccess = portalAccess;
 
-    const updatedClient = await Client.findByIdAndUpdate(id, updateData, { new: true }).select('-password')
+    // Allow Admin to set password manually
+    if (req.body.password && req.body.password.trim() !== '') {
+      client.password = req.body.password; // Pre-save hook will hash this
+    }
+
+    const updatedClient = await client.save();
 
     res.status(200).json({
       success: true,

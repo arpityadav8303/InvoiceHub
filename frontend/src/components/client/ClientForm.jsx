@@ -14,6 +14,7 @@ const ClientForm = ({
   isLoading
 }) => {
   const { showToast } = useToast();
+  const [useAutoPassword, setUseAutoPassword] = useState(true);
 
   // 1. Form State
   const [formData, setFormData] = useState({
@@ -23,6 +24,7 @@ const ClientForm = ({
     companyName: '',
     address: '',
     gstIn: '',
+    password: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -30,13 +32,29 @@ const ClientForm = ({
   // 2. Pre-fill data if editing
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      setFormData(prev => ({
+        ...prev,
+        ...initialData,
+        password: '' // Don't pre-fill password on edit
+      }));
+      // If editing, we generally don't set password unless explicitly asked, so keep auto (which means no-op here usually) or hidden
+      // But for edit mode, we might want to hide this entire section or handle password ressetting differently.
+      // For now, let's just default auto-password to true so the field is hidden by default.
     }
   }, [initialData]);
 
   // 3. Handle Input Changes
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    // Handle Checkbox
+    if (type === 'checkbox' && name === 'useAutoPassword') {
+      setUseAutoPassword(checked);
+      if (checked) {
+        setFormData(prev => ({ ...prev, password: '' })); // Clear password if auto
+      }
+      return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
 
     // Clear error when user types
@@ -52,13 +70,23 @@ const ClientForm = ({
     let isValid = true;
 
     Object.keys(clientSchema).forEach(field => {
+      // Skip validation for fields not in form
+      if (field === 'password' && useAutoPassword) return;
+
       const fieldValidators = clientSchema[field];
-      const error = validateField(formData[field], fieldValidators);
-      if (error) {
-        newErrors[field] = error;
-        isValid = false;
+      if (formData[field] !== undefined) { // Only validate if field exists in form data
+        const error = validateField(formData[field], fieldValidators);
+        if (error) {
+          newErrors[field] = error;
+          isValid = false;
+        }
       }
     });
+
+    if (!useAutoPassword && (!formData.password || formData.password.length < 6)) {
+      newErrors.password = "Password must be at least 6 characters";
+      isValid = false;
+    }
 
     setErrors(newErrors);
 
@@ -69,7 +97,12 @@ const ClientForm = ({
     }
 
     // C. Submit
-    onSubmit(formData);
+    // Filter out password if auto-gen is used
+    const submissionData = { ...formData };
+    if (useAutoPassword) {
+      delete submissionData.password;
+    }
+    onSubmit(submissionData);
   };
 
   return (
@@ -115,6 +148,45 @@ const ClientForm = ({
             placeholder="+91 98765 43210"
             required
           />
+
+          {/* Password Section - Only show for new clients or specific edit flow if needed */}
+          {!initialData && (
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Login Credentials</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="useAutoPassword"
+                    name="useAutoPassword"
+                    checked={useAutoPassword}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <label htmlFor="useAutoPassword" class="text-xs text-gray-500 cursor-pointer select-none">Auto-generate</label>
+                </div>
+              </div>
+
+              {!useAutoPassword && (
+                <div className="mt-2">
+                  <Input
+                    label="Password"
+                    name="password"
+                    type="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    error={errors.password}
+                    placeholder="Set a password..."
+                  />
+                  <p className="text-xs text-gray-500 mt-1">A welcome email with login details will be sent to the client.</p>
+                </div>
+              )}
+              {useAutoPassword && (
+                <p className="text-xs text-gray-500 italic">A secure password will be automatically generated and emailed to the client.</p>
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Right Column */}

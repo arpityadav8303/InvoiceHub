@@ -1,4 +1,4 @@
-import api from './axiosConfig';
+import api from './api';
 
 export const getRiskAssessment = async (clientId) => {
     try {

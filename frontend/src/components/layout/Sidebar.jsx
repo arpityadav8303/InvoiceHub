@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, FileText, Users, CreditCard, ShieldAlert, LogOut } from 'lucide-react';
 import { logoutUser } from '../../services/authService';
 
-const Sidebar = () => {
+const Sidebar = ({ className = '' }) => {
   const navigate = useNavigate();
 
   const navItems = [
@@ -26,8 +26,12 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="w-64 h-screen bg-gray-900 text-white fixed left-0 top-0 p-4 flex flex-col">
-      <div className="mb-8 px-2">
+    <div className={`w-full h-full bg-gray-900 text-white flex flex-col p-4 ${className}`}>
+      <div className="mb-8 px-2 flex items-center gap-2">
+        {/* Simple Logo Placeholder */}
+        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white">
+          I
+        </div>
         <h1 className="text-xl font-bold text-blue-400">InvoiceHub</h1>
       </div>
       <nav className="space-y-2 flex-1">

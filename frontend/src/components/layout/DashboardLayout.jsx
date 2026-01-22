@@ -1,18 +1,24 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom'; // Renders the current page
+import React, { useState, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom'; // Renders the current page
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import MobileSidebar from './MobileSidebar';
 
 const DashboardLayout = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  // Close mobile sidebar automatically when route changes
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
 
       {/* 1. Desktop Sidebar (Hidden on mobile) */}
       <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
-        <Sidebar />
+        <Sidebar className="" />
       </div>
 
       {/* 2. Mobile Sidebar (Hidden on desktop) */}

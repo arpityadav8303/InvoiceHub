@@ -13,7 +13,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [userType, setUserType] = useState('user'); 
+  const [userType, setUserType] = useState('user');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
@@ -44,7 +44,7 @@ function LoginForm() {
         if (userType === 'user') {
           navigate('/dashboard/user', { replace: true });
         } else {
-          navigate('/dashboard/client', { replace: true });
+          navigate('/portal/dashboard', { replace: true });
         }
       }
     } catch (err) {
@@ -57,7 +57,7 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-md">
       <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Login</h2>
-      
+
       {error && <FormErrorMessage message={error} onClose={() => setError('')} />}
 
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
@@ -77,7 +77,7 @@ function LoginForm() {
       <FormInput label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} error={validationErrors.email} required name="email" />
       <PasswordInput label="Password" value={password} onChange={(e) => setPassword(e.target.value)} error={validationErrors.password} required name="password" />
       <FormButton text="Login" loading={loading} disabled={loading} type="submit" />
-      
+
       <p className="text-center text-gray-600 mt-4">
         Don't have an account? <a href="/signup" className="text-blue-600 hover:text-blue-800 font-medium">Sign Up</a>
       </p>

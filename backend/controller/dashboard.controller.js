@@ -4,60 +4,243 @@ import Payment from '../models/payment.model.js';
 import mongoose from 'mongoose';
 
 export const getDashboardOverview = async (req, res) => {
-    try {
-        const userId = new mongoose.Types.ObjectId(req.user._id);
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user._id);
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+    sixMonthsAgo.setDate(1); // Start of the month
+    sixMonthsAgo.setHours(0, 0, 0, 0);
 
-        // 1. Total Clients Stats
-        const clientStats = await Client.aggregate([
-            { $match: { userId } },
-            { $group: {
-                _id: null,
-                total: { $sum: 1 },
-                active: { $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] } },
-                inactive: { $sum: { $cond: [{ $eq: ["$status", "inactive"] }, 1, 0] } }
-            }}
-        ]);
+    // 1. Total Clients Stats
+    const clientStatsPromise = Client.aggregate([
+      { $match: { userId } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          active: { $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] } },
+          inactive: { $sum: { $cond: [{ $eq: ["$status", "inactive"] }, 1, 0] } }
+        }
+      }
+    ]);
 
-        // 2. Revenue & Invoice Stats
-        const invoiceStats = await Invoice.aggregate([
-            { $match: { userId } },
-            { $group: {
-                _id: null,
-                totalRevenue: { $sum: "$total" },
-                totalPaid: { $sum: "$paidAmount" },
-                outstanding: { $sum: "$remainingAmount" },
-                overdue: { 
-                    $sum: { 
-                        $cond: [
-                            { $and: [
-                                { $lt: ["$dueDate", new Date()] },
-                                { $ne: ["$status", "paid"] }
-                            ]}, 
-                            "$remainingAmount", 
-                            0
-                        ] 
-                    }
-                }
-            }}
-        ]);
-
-        const stats = invoiceStats[0] || {};
-        const clients = clientStats[0] || { total: 0, active: 0, inactive: 0 };
-
-        res.status(200).json({
-            success: true,
-            data: {
-                totalClients: { active: clients.active, inactive: clients.inactive },
-                totalRevenue: stats.totalRevenue || 0,
-                outstandingAmount: stats.outstanding || 0,
-                overdueAmount: stats.overdue || 0,
-                paymentRate: stats.totalRevenue ? Math.round((stats.totalPaid / stats.totalRevenue) * 100) : 0
+    // 2. Revenue & Invoice Stats
+    const invoiceStatsPromise = Invoice.aggregate([
+      { $match: { userId } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$total" },
+          totalPaid: { $sum: "$paidAmount" },
+          outstanding: { $sum: "$remainingAmount" },
+          overdue: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $lt: ["$dueDate", new Date()] },
+                    { $ne: ["$status", "paid"] }
+                  ]
+                },
+                "$remainingAmount",
+                0
+              ]
             }
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
+          },
+          paidCount: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, 1, 0] } },
+          pendingCount: { $sum: { $cond: [{ $in: ["$status", ["sent", "partially_paid", "draft"]] }, 1, 0] } },
+          overdueCount: { $sum: { $cond: [{ $and: [{ $lt: ["$dueDate", new Date()] }, { $ne: ["$status", "paid"] }] }, 1, 0] } }
+        }
+      }
+    ]);
+
+    // 3. Monthly Revenue (Last 6 Months)
+    const revenueGraphPromise = Payment.aggregate([
+      {
+        $match: {
+          userId,
+          paymentDate: { $gte: sixMonthsAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            month: { $month: "$paymentDate" },
+            year: { $year: "$paymentDate" }
+          },
+          total: { $sum: "$amount" }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+
+    // 4. Client Growth (Last 6 Months)
+    const clientGrowthPromise = Client.aggregate([
+      {
+        $match: {
+          userId,
+          createdAt: { $gte: sixMonthsAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            month: { $month: "$createdAt" },
+            year: { $year: "$createdAt" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+
+    // 5. Recent Activity (Latest 5 items)
+    const recentPaymentsPromise = Payment.find({ userId })
+      .sort({ paymentDate: -1 })
+      .limit(5)
+      .populate('clientId', 'firstName lastName')
+      .lean();
+
+    const recentInvoicesPromise = Invoice.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('clientId', 'firstName lastName')
+      .lean();
+
+    const recentClientsPromise = Client.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean();
+
+    // 6. Upcoming Invoices
+    const upcomingInvoicesPromise = Invoice.find({
+      userId,
+      status: { $ne: 'paid' },
+      dueDate: { $gte: new Date() }
+    })
+      .sort({ dueDate: 1 })
+      .limit(5)
+      .populate('clientId', 'firstName lastName companyName')
+      .lean();
+
+    const [
+      clientStatsRes,
+      invoiceStatsRes,
+      revenueGraph,
+      clientGrowth,
+      recentPayments,
+      recentInvoices,
+      recentClients,
+      upcomingInvoices
+    ] = await Promise.all([
+      clientStatsPromise,
+      invoiceStatsPromise,
+      revenueGraphPromise,
+      clientGrowthPromise,
+      recentPaymentsPromise,
+      recentInvoicesPromise,
+      recentClientsPromise,
+      upcomingInvoicesPromise
+    ]);
+
+    // --- Process Data for Frontend ---
+
+    // Invoice Stats
+    const stats = invoiceStatsRes[0] || {};
+    const clients = clientStatsRes[0] || { total: 0, active: 0, inactive: 0 };
+
+    // Process Revenue Graph - Fill missing months
+    const processedRevenueData = fillMissingMonths(revenueGraph, sixMonthsAgo, 'total');
+
+    // Process Client Growth - Fill missing months
+    const processedClientGrowth = fillMissingMonths(clientGrowth, sixMonthsAgo, 'count');
+
+    // Merge and Sort Recent Activity
+    const activityList = [
+      ...recentPayments.map(p => ({
+        id: p._id,
+        type: 'payment',
+        message: `Payment of ₹${p.amount} received from ${p.clientId?.firstName} ${p.clientId?.lastName}`,
+        time: p.paymentDate,
+        amount: p.amount
+      })),
+      ...recentInvoices.map(i => ({
+        id: i._id,
+        type: 'invoice',
+        message: `Invoice #${i.invoiceNumber} created for ${i.clientId?.firstName} ${i.clientId?.lastName}`,
+        time: i.createdAt,
+        amount: i.total
+      })),
+      ...recentClients.map(c => ({
+        id: c._id,
+        type: 'client',
+        message: `New client "${c.businessName}" added`,
+        time: c.createdAt
+      }))
+    ]
+      .sort((a, b) => new Date(b.time) - new Date(a.time))
+      .slice(0, 5);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        // Key Stats
+        totalClients: { active: clients.active, inactive: clients.inactive },
+        totalRevenue: stats.totalRevenue || 0,
+        outstandingAmount: stats.outstanding || 0,
+        overdueAmount: stats.overdue || 0,
+        paymentRate: stats.totalRevenue ? Math.round((stats.totalPaid / stats.totalRevenue) * 100) : 0,
+
+        // Charts Data
+        revenueData: processedRevenueData,
+        clientGrowthData: processedClientGrowth,
+
+        // Pie Chart Data
+        invoiceStats: {
+          paid: stats.paidCount || 0,
+          pending: stats.pendingCount || 0,
+          overdue: stats.overdueCount || 0
+        },
+
+        // Lists
+        recentActivity: activityList,
+        upcomingInvoices: upcomingInvoices.map(inv => ({
+          id: inv.invoiceNumber,
+          client: inv.clientId?.companyName || `${inv.clientId?.firstName} ${inv.clientId?.lastName}` || 'Unknown',
+          amount: inv.total,
+          dueDate: inv.dueDate
+        }))
+      }
+    });
+  } catch (error) {
+    console.error("Dashboard overview error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
+
+// Helper: Fill missing months with 0
+function fillMissingMonths(data, startDate, valueKey) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const result = [];
+  const currentDate = new Date(startDate);
+  const now = new Date();
+
+  while (currentDate <= now) {
+    const monthIdx = currentDate.getMonth();
+    const year = currentDate.getFullYear();
+    const monthName = months[monthIdx];
+
+    const found = data.find(item => item._id.month === (monthIdx + 1) && item._id.year === year);
+
+    result.push({
+      name: monthName,
+      [valueKey === 'total' ? 'value' : 'clients']: found ? found[valueKey] : 0
+    });
+
+    currentDate.setMonth(currentDate.getMonth() + 1);
+  }
+  return result;
+}
 export const getRevenueAnalytics = async (req, res) => {
   try {
     const { timeRange = 'month', startDate, endDate, groupBy } = req.query;
@@ -174,7 +357,7 @@ function calculateSummaryStats(invoices, payments) {
     totalInvoiced: parseFloat(totalInvoiced.toFixed(2)),
     totalPaid: parseFloat(totalPaid.toFixed(2)),
     totalOutstanding: parseFloat(totalOutstanding.toFixed(2)),
-    averageInvoiceValue: invoices.length > 0 
+    averageInvoiceValue: invoices.length > 0
       ? parseFloat((totalInvoiced / invoices.length).toFixed(2))
       : 0,
     collectionRate: totalInvoiced > 0
@@ -693,7 +876,7 @@ export const getAdvancedClientList = async (req, res) => {
             {
               $cond: [
                 { $gt: ['$overdueAmount', 0] },
-                { $multiply: [{ $log: [{ $add: ['$overdueAmount', 1], },10] }, 2] },
+                { $multiply: [{ $log: [{ $add: ['$overdueAmount', 1], }, 10] }, 2] },
                 0
               ]
             }
@@ -728,7 +911,7 @@ export const getAdvancedClientList = async (req, res) => {
 
     // ========== FILTER BY PAYMENT STATUS & OVERDUE ==========
     const filterStage = { $match: {} };
-    
+
     if (status === 'on-time') {
       filterStage.$match.paymentStatus = 'on-time';
     } else if (status === 'late') {
@@ -925,15 +1108,15 @@ export const getAdvancedClientList = async (req, res) => {
  */
 function calculateDaysOverdue(dueDate) {
   if (!dueDate) return 0;
-  
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const due = new Date(dueDate);
   due.setHours(0, 0, 0, 0);
-  
+
   if (due >= today) return 0;
-  
+
   const diffTime = today - due;
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
@@ -1108,7 +1291,7 @@ export const getClientProfile = async (req, res) => {
         // SUMMARY METRICS
         summaryMetrics: {
           collectionRate: calculateCollectionRate(client.paymentStats),
-          averageInvoiceValue: invoices.length > 0 
+          averageInvoiceValue: invoices.length > 0
             ? parseFloat((client.paymentStats.totalAmount / client.paymentStats.totalInvoices).toFixed(2))
             : 0,
           outstandingDays: calculateOutstandingDays(invoices)
@@ -1132,13 +1315,13 @@ export const getClientProfile = async (req, res) => {
  */
 function calculateInvoiceSummary(invoices) {
   const now = new Date();
-  
+
   const draft = invoices.filter(inv => inv.status === 'draft').length;
   const sent = invoices.filter(inv => inv.status === 'sent').length;
   const paid = invoices.filter(inv => inv.status === 'paid').length;
   const partiallyPaid = invoices.filter(inv => inv.status === 'partially_paid').length;
-  
-  const overdue = invoices.filter(inv => 
+
+  const overdue = invoices.filter(inv =>
     inv.dueDate && new Date(inv.dueDate) < now && inv.status !== 'paid'
   ).length;
 
@@ -1164,7 +1347,7 @@ function calculateInvoiceSummary(invoices) {
  */
 function calculateCollectionRate(paymentStats) {
   if (paymentStats.totalAmount === 0) return 0;
-  
+
   const rate = (paymentStats.totalPaid / paymentStats.totalAmount) * 100;
   return parseFloat(rate.toFixed(2));
 }
@@ -1175,10 +1358,10 @@ function calculateCollectionRate(paymentStats) {
 function calculateRelationshipLength(createdAt) {
   const now = new Date();
   const created = new Date(createdAt);
-  
-  const monthsDiff = (now.getFullYear() - created.getFullYear()) * 12 + 
-                     (now.getMonth() - created.getMonth());
-  
+
+  const monthsDiff = (now.getFullYear() - created.getFullYear()) * 12 +
+    (now.getMonth() - created.getMonth());
+
   if (monthsDiff < 1) {
     return 'Less than a month';
   } else if (monthsDiff < 12) {
@@ -1186,8 +1369,8 @@ function calculateRelationshipLength(createdAt) {
   } else {
     const years = Math.floor(monthsDiff / 12);
     const months = monthsDiff % 12;
-    return months > 0 
-      ? `${years} year(s) and ${months} month(s)` 
+    return months > 0
+      ? `${years} year(s) and ${months} month(s)`
       : `${years} year(s)`;
   }
 }
@@ -1198,14 +1381,14 @@ function calculateRelationshipLength(createdAt) {
 function calculateOutstandingDays(invoices) {
   const now = new Date();
   const unpaidInvoices = invoices.filter(inv => inv.status !== 'paid');
-  
+
   if (unpaidInvoices.length === 0) return 0;
-  
+
   const totalDays = unpaidInvoices.reduce((sum, inv) => {
     const createdDate = new Date(inv.invoiceDate);
     const days = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
     return sum + days;
   }, 0);
-  
+
   return Math.round(totalDays / unpaidInvoices.length);
 }

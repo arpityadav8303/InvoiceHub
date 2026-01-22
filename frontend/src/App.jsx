@@ -3,19 +3,32 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastProvider';
 import DashboardLayout from './components/layout/DashboardLayout';
-import ProtectedRoute from './components/auth/ProtectedRoute'; 
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import LoginPage from './pages/auth/LoginPage';
-import SignupPage from './pages/auth/SignupPage'; 
+import SignupPage from './pages/auth/SignupPage';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import NotFound from './components/common/NotFound';
 import DashboardOverview from './pages/dashboard/DashboardOverview';
 import ClientsPage from './pages/dashboard/ClientsPage';
 import ClientDetailsPage from './pages/dashboard/ClientDetailsPage';
+import CreateClientPage from './pages/dashboard/CreateClientPage';
+import EditClientPage from './pages/dashboard/EditClientPage';
 import ClientForm from './components/client/ClientForm';
 import InvoiceDetailsPage from './pages/dashboard/InvoiceDetailsPage';
 import EditInvoicePage from './pages/dashboard/EditInvoicePage';
+import CreateInvoicePage from './pages/dashboard/CreateInvoicePage';
 import ClientRiskDetailsPage from './pages/dashboard/ClientRiskDetailsPage';
 import PaymentDetailsPage from './pages/dashboard/PaymentDetailsPage';
+import PaymentsPage from './pages/dashboard/PaymentsPage';
+import InvoicesPage from './pages/dashboard/InvoicesPage';
+
+import RiskPage from './pages/dashboard/RiskPage';
+
+import ClientDashboardLayout from './components/layout/ClientDashboardLayout';
+import ClientDashboardPage from './pages/client/ClientDashboardPage';
+import ClientInvoicesPage from './pages/client/ClientInvoicesPage';
+import ClientPaymentsPage from './pages/client/ClientPaymentsPage';
+import ClientProfilePage from './pages/client/ClientProfilePage';
 
 function App() {
   return (
@@ -28,33 +41,47 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
 
-              {/* Protected Routes */}
+              {/* Protected Routes - Main App (Business Owner) */}
               <Route path="/" element={
                 <ProtectedRoute>
                   <DashboardLayout />
                 </ProtectedRoute>
               }>
                 {/* Default Redirect */}
-                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route index element={<Navigate to="/dashboard/user" replace />} />
 
-                {/* Main Dashboards */}
                 <Route path="dashboard/user" element={<DashboardOverview />} />
-                <Route path="dashboard/client" element={<div>Client View (Coming Soon)</div>} />
 
-                {/* Modules */}
-                <Route path="clients" element={<ClientsPage />} /> {/* Wrapped in layout, remove div padding if needed */}
-                <Route path="clients/new" element={<ClientForm onSubmit={console.log} isLoading={false} />} />
+                {/* Business Modules */}
+                <Route path="clients" element={<ClientsPage />} />
+                <Route path="clients/new" element={<CreateClientPage />} />
                 <Route path="clients/:id" element={<ClientDetailsPage />} />
+                <Route path="clients/edit/:id" element={<EditClientPage />} />
                 <Route path="clients/:id/risk" element={<ClientRiskDetailsPage />} />
 
-                <Route path="invoices" element={<div className="p-4">Invoice List Component</div>} />
-                <Route path="invoices/new" element={<EditInvoicePage />} />
+                <Route path="risk" element={<RiskPage />} />
+
+                <Route path="invoices" element={<InvoicesPage />} />
+                <Route path="invoices/new" element={<CreateInvoicePage />} />
                 <Route path="invoices/:id" element={<InvoiceDetailsPage />} />
                 <Route path="invoices/edit/:id" element={<EditInvoicePage />} />
 
+                <Route path="payments" element={<PaymentsPage />} />
                 <Route path="payments/:id" element={<PaymentDetailsPage />} />
+              </Route>
 
-                {/* 404 for inner dashboard routes */}
+              {/* Protected Routes - Client Portal */}
+              <Route path="/portal" element={
+                <ProtectedRoute>
+                  <ClientDashboardLayout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<Navigate to="/portal/dashboard" replace />} />
+                <Route path="dashboard" element={<ClientDashboardPage />} />
+                <Route path="invoices" element={<ClientInvoicesPage />} />
+                <Route path="payments" element={<ClientPaymentsPage />} />
+                <Route path="profile" element={<ClientProfilePage />} />
+
                 <Route path="*" element={<NotFound />} />
               </Route>
 
@@ -63,8 +90,8 @@ function App() {
             </Routes>
           </Router>
         </ToastProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+      </AuthProvider >
+    </ErrorBoundary >
   );
 }
 

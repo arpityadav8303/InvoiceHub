@@ -63,7 +63,8 @@ export const getClientRiskAssessment = async (req, res) => {
     const recommendations = generateRecommendations(factors, riskLevel, paymentTrend);
 
     // ========== PREDICT NEXT PAYMENT DATE ==========
-    const predictedPaymentDate = predictNextPaymentDate(invoices, payments, factors.averageDaysToPayment);
+    const avgDaysToPay = client.paymentStats?.averageDaysToPayment || 30;
+    const predictedPaymentDate = predictNextPaymentDate(invoices, payments, avgDaysToPay);
 
     // ========== IDENTIFY ALERTS ==========
     const alerts = identifyAlerts(factors, client, invoices);
@@ -80,7 +81,7 @@ export const getClientRiskAssessment = async (req, res) => {
         clientName: `${client.firstName} ${client.lastName}`,
         clientEmail: client.email,
         companyName: client.companyName,
-        
+
         // RISK SUMMARY
         riskSummary: {
           riskScore: parseFloat(riskScore.toFixed(2)),
@@ -94,10 +95,10 @@ export const getClientRiskAssessment = async (req, res) => {
         // RISK FACTORS
         factors: {
           paymentReliabilityScore: {
-            score: client.paymentStats.paymentReliabilityScore,
+            score: client.paymentStats?.paymentReliabilityScore || 100,
             weight: 30,
             impact: 'High',
-            status: client.paymentStats.paymentReliabilityScore >= 80 ? 'Good' : 'Needs Attention'
+            status: (client.paymentStats?.paymentReliabilityScore || 100) >= 80 ? 'Good' : 'Needs Attention'
           },
           averageDaysOverdue: {
             days: parseFloat(factors.averageDaysOverdue.toFixed(2)),
@@ -144,13 +145,13 @@ export const getClientRiskAssessment = async (req, res) => {
           partiallyPaidInvoices: metrics.partiallyPaidInvoices,
           unpaidInvoices: metrics.unpaidInvoices,
           overdueInvoices: metrics.overdueInvoices,
-          
+
           paymentMetrics: {
-            onTimePayments: client.paymentStats.onTimePayments,
-            latePayments: client.paymentStats.latePayments,
+            onTimePayments: client.paymentStats?.onTimePayments || 0,
+            latePayments: client.paymentStats?.latePayments || 0,
             onTimePercentage: metrics.onTimePaymentPercentage,
             latePercentage: metrics.latePaymentPercentage,
-            averageDaysToPayment: parseFloat(client.paymentStats.averageDaysToPayment.toFixed(2)),
+            averageDaysToPayment: parseFloat((client.paymentStats?.averageDaysToPayment || 0).toFixed(2)),
             medianPaymentDays: calculateMedianPaymentDays(invoices, payments)
           },
 
@@ -270,10 +271,10 @@ function calculateRiskFactors(client, invoices, payments) {
   const recentLatePayments = invoices.filter(inv => {
     const invoiceDate = new Date(inv.invoiceDate);
     if (invoiceDate < sixMonthsAgo) return false;
-    
+
     const payment = payments.find(p => p.invoiceId.toString() === inv._id.toString());
     if (!payment) return inv.dueDate && new Date(inv.dueDate) < now;
-    
+
     return new Date(payment.paymentDate) > new Date(inv.dueDate);
   }).length;
 
@@ -296,7 +297,8 @@ function calculateRiskFactors(client, invoices, payments) {
   const paidAmount = payments.reduce((sum, pay) => sum + pay.amount, 0);
 
   // Determine payment velocity
-  const paymentVelocity = determinePaymentVelocity(client.paymentStats.averageDaysToPayment);
+  const avgDays = client.paymentStats?.averageDaysToPayment || 0;
+  const paymentVelocity = determinePaymentVelocity(avgDays);
 
   return {
     recentLatePayments,
@@ -356,15 +358,15 @@ function analyzePaymentTrend(client, invoices, payments) {
 
   // Get recent and older payments
   const recentPayments = payments.filter(p => new Date(p.paymentDate) >= threeMonthsAgo);
-  const olderPayments = payments.filter(p => 
-    new Date(p.paymentDate) >= sixMonthsAgo && 
+  const olderPayments = payments.filter(p =>
+    new Date(p.paymentDate) >= sixMonthsAgo &&
     new Date(p.paymentDate) < threeMonthsAgo
   );
 
   // Calculate on-time percentage for each period
   const recentInvoices = invoices.filter(inv => new Date(inv.invoiceDate) >= threeMonthsAgo);
-  const olderInvoices = invoices.filter(inv => 
-    new Date(inv.invoiceDate) >= sixMonthsAgo && 
+  const olderInvoices = invoices.filter(inv =>
+    new Date(inv.invoiceDate) >= sixMonthsAgo &&
     new Date(inv.invoiceDate) < threeMonthsAgo
   );
 
@@ -398,9 +400,9 @@ function analyzePaymentTrend(client, invoices, payments) {
   return {
     trend,
     direction,
-    trendDescription: trend === 'improving' ? 'Payment performance is getting better' : 
-                     trend === 'declining' ? 'Payment performance is getting worse' :
-                     'Payment performance is stable',
+    trendDescription: trend === 'improving' ? 'Payment performance is getting better' :
+      trend === 'declining' ? 'Payment performance is getting worse' :
+        'Payment performance is stable',
     recentPerformance: parseFloat(recentPercentage.toFixed(2)),
     sixMonthPerformance: parseFloat(olderPercentage.toFixed(2)),
     improvementRate
@@ -491,8 +493,8 @@ function generateRecommendations(factors, riskLevel, paymentTrend) {
  */
 function predictNextPaymentDate(invoices, payments, averageDaysToPayment) {
   // Find oldest unpaid invoice
-  const unpaidInvoices = invoices.filter(inv => 
-    inv.status !== 'paid' && 
+  const unpaidInvoices = invoices.filter(inv =>
+    inv.status !== 'paid' &&
     (!payments.some(p => p.invoiceId.toString() === inv._id.toString()))
   ).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
@@ -521,12 +523,12 @@ function identifyAlerts(factors, client, invoices) {
   const now = new Date();
 
   // Alert 1: Overdue invoices
-  const overdueInvoices = invoices.filter(inv => 
+  const overdueInvoices = invoices.filter(inv =>
     inv.dueDate && new Date(inv.dueDate) < now && inv.status !== 'paid'
   );
 
   if (overdueInvoices.length > 0) {
-    const overdueAmount = overdueInvoices.reduce((sum, inv) => 
+    const overdueAmount = overdueInvoices.reduce((sum, inv) =>
       sum + (inv.total - inv.paidAmount), 0
     );
 
@@ -585,7 +587,7 @@ function identifyAlerts(factors, client, invoices) {
   }
 
   // Alert 5: No recent payment activity
-  const lastPaymentDate = client.paymentStats.lastPaymentDate;
+  const lastPaymentDate = client.paymentStats?.lastPaymentDate;
   if (lastPaymentDate) {
     const daysSincePayment = Math.floor((now - new Date(lastPaymentDate)) / (1000 * 60 * 60 * 24));
     if (daysSincePayment > 90) {
@@ -615,11 +617,11 @@ function calculateAdditionalMetrics(invoices, payments) {
   const paidInvoices = invoices.filter(inv => inv.status === 'paid').length;
   const partiallyPaidInvoices = invoices.filter(inv => inv.status === 'partially_paid').length;
   const unpaidInvoices = invoices.filter(inv => inv.status === 'sent' || inv.status === 'draft').length;
-  const overdueInvoices = invoices.filter(inv => 
+  const overdueInvoices = invoices.filter(inv =>
     inv.dueDate && new Date(inv.dueDate) < now && inv.status !== 'paid'
   ).length;
 
-  const activeDueInvoices = invoices.filter(inv => 
+  const activeDueInvoices = invoices.filter(inv =>
     (inv.total - inv.paidAmount) > 0 && inv.status !== 'draft'
   ).length;
 
@@ -627,26 +629,26 @@ function calculateAdditionalMetrics(invoices, payments) {
   const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
   const totalPaid = payments.reduce((sum, pay) => sum + pay.amount, 0);
   const totalOutstanding = totalInvoiced - totalPaid;
-  const overdueAmount = invoices.filter(inv => 
+  const overdueAmount = invoices.filter(inv =>
     inv.dueDate && new Date(inv.dueDate) < now && inv.status !== 'paid'
   ).reduce((sum, inv) => sum + (inv.total - inv.paidAmount), 0);
 
   // Find oldest overdue
-  const overdueInvoicesList = invoices.filter(inv => 
+  const overdueInvoicesList = invoices.filter(inv =>
     inv.dueDate && new Date(inv.dueDate) < now && inv.status !== 'paid'
   ).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
   const oldestOverdueDate = overdueInvoicesList.length > 0 ? overdueInvoicesList[0].dueDate : null;
-  const daysOldestOverdue = oldestOverdueDate ? 
+  const daysOldestOverdue = oldestOverdueDate ?
     Math.ceil((now - new Date(oldestOverdueDate)) / (1000 * 60 * 60 * 24)) : 0;
 
   // Find next due
-  const futureDueInvoices = invoices.filter(inv => 
+  const futureDueInvoices = invoices.filter(inv =>
     inv.dueDate && new Date(inv.dueDate) >= now
   ).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
   const nextDueDate = futureDueInvoices.length > 0 ? futureDueInvoices[0].dueDate : null;
-  const daysUntilDue = nextDueDate ? 
+  const daysUntilDue = nextDueDate ?
     Math.ceil((new Date(nextDueDate) - now) / (1000 * 60 * 60 * 24)) : null;
 
   // Calculate percentages
@@ -699,7 +701,7 @@ function calculateMedianPaymentDays(invoices, payments) {
     .map(inv => {
       const payment = payments.find(p => p.invoiceId.toString() === inv._id.toString());
       if (!payment) return null;
-      
+
       const days = Math.ceil((new Date(payment.paymentDate) - new Date(inv.invoiceDate)) / (1000 * 60 * 60 * 24));
       return days;
     })
@@ -707,7 +709,7 @@ function calculateMedianPaymentDays(invoices, payments) {
     .sort((a, b) => a - b);
 
   if (paymentDays.length === 0) return 0;
-  
+
   const mid = Math.floor(paymentDays.length / 2);
   return paymentDays.length % 2 !== 0 ? paymentDays[mid] : (paymentDays[mid - 1] + paymentDays[mid]) / 2;
 }
@@ -722,7 +724,7 @@ function calculatePaymentFrequency(payments) {
   oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
   const recentPayments = payments.filter(p => new Date(p.paymentDate) >= oneMonthAgo);
-  
+
   if (recentPayments.length >= 2) return 'Frequent';
   if (recentPayments.length === 1) return 'Occasional';
   return 'Irregular';
@@ -739,7 +741,7 @@ export function calculateVolatilityIndex(invoices, payments) {
     .map(inv => {
       const payment = payments.find(p => p.invoiceId.toString() === inv._id.toString());
       if (!payment) return null;
-      
+
       return Math.ceil((new Date(payment.paymentDate) - new Date(inv.dueDate)) / (1000 * 60 * 60 * 24));
     })
     .filter(days => days !== null);
@@ -748,7 +750,7 @@ export function calculateVolatilityIndex(invoices, payments) {
 
   // Calculate mean
   const mean = paymentDays.reduce((a, b) => a + b) / paymentDays.length;
-  
+
   // Calculate standard deviation
   const squareDiffs = paymentDays.map(days => Math.pow(days - mean, 2));
   const avgSquareDiff = squareDiffs.reduce((a, b) => a + b) / paymentDays.length;
@@ -767,27 +769,27 @@ export function calculatePaymentProbability(factors, type) {
   if (type === 'on-time') {
     // Higher payment score = higher probability
     const scoreBoost = (100 - (100 - factors.paymentReliabilityScore || 100)) * 0.01;
-    
+
     // Lower days overdue = higher probability
     const overdueDeduction = Math.min(1, factors.averageDaysOverdue / 100);
-    
+
     // Fewer recent late payments = higher probability
     const latePaymentDeduction = Math.min(1, factors.recentLatePayments / 5);
-    
+
     probability = Math.max(0, Math.min(100, (scoreBoost * 100) - (overdueDeduction * 50) - (latePaymentDeduction * 30)));
   } else if (type === 'late') {
     // Based on history and trend
     const recentLateWeight = (factors.recentLatePayments / 3) * 40;
     const velocityWeight = factors.paymentVelocity === 'slow' ? 30 : factors.paymentVelocity === 'normal' ? 10 : 0;
     const scoreWeight = (100 - (factors.paymentReliabilityScore || 100)) * 0.3;
-    
+
     probability = Math.min(100, recentLateWeight + velocityWeight + scoreWeight);
   } else if (type === 'very-late') {
     // High risk of very late payment
     const overdueWeight = Math.min(1, factors.averageDaysOverdue / 60) * 50;
     const slowVelocityWeight = factors.paymentVelocity === 'slow' ? 40 : 0;
     const scoreWeight = (100 - (factors.paymentReliabilityScore || 100)) * 0.4;
-    
+
     probability = Math.min(100, overdueWeight + slowVelocityWeight + scoreWeight);
   }
 
@@ -799,7 +801,7 @@ export function calculatePaymentProbability(factors, type) {
  */
 export function getNextReviewDate(riskLevel) {
   const now = new Date();
-  
+
   if (riskLevel === 'HIGH') {
     // Review in 1 week
     now.setDate(now.getDate() + 7);
@@ -810,6 +812,6 @@ export function getNextReviewDate(riskLevel) {
     // Review in 1 month
     now.setMonth(now.getMonth() + 1);
   }
-  
+
   return now.toISOString();
 }

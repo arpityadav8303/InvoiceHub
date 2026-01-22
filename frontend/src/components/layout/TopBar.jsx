@@ -7,7 +7,16 @@ import { useAuth } from '../../context/AuthContext';
 import { getInitials } from '../../utils/helpers';
 
 const TopBar = ({ onMobileMenuClick, pageTitle = "Dashboard" }) => {
-  const { user, logout } = useAuth();
+  const { user, userType, logout } = useAuth();
+
+  // Helper to get display name
+  const getUserName = () => {
+    if (user?.name) return user.name;
+    if (user?.firstName && user?.lastName) return `${user.firstName} ${user.lastName}`;
+    return 'Guest User';
+  };
+
+  const userName = getUserName();
 
   // Dropdown items for User Profile
   const userMenuItems = [
@@ -63,14 +72,14 @@ const TopBar = ({ onMobileMenuClick, pageTitle = "Dashboard" }) => {
                 <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
                   <div className="text-right hidden md:block">
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {user?.name || 'Guest User'}
+                      {userName}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {user?.role || 'Admin'}
+                      {user?.role || (userType === 'client' ? 'Client' : 'Business Owner')}
                     </p>
                   </div>
                   <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold shadow-sm">
-                    {getInitials(user?.name || 'Guest')}
+                    {getInitials(userName)}
                   </div>
                 </div>
               }

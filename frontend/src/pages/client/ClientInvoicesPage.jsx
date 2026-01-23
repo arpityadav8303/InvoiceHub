@@ -90,7 +90,7 @@ const ClientInvoicesPage = () => {
                                     <tr key={inv._id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-gray-900">{inv.invoiceNumber}</td>
                                         <td className="px-6 py-4 text-gray-600">{new Date(inv.invoiceDate).toLocaleDateString()}</td>
-                                        <td className="px-6 py-4 font-medium text-gray-900">${inv.total}</td>
+                                        <td className="px-6 py-4 font-medium text-gray-900">₹{inv.total}</td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${inv.status === 'paid' ? 'bg-green-100 text-green-700' :
                                                     inv.status === 'overdue' ? 'bg-red-100 text-red-700' :

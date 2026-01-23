@@ -3,7 +3,7 @@ import { Menu, Bell, Search, User } from 'lucide-react';
 import Button from '../common/Button';
 import SearchBar from '../common/SearchBar'; // Reusing generic search
 import Dropdown from '../common/Dropdown';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { getInitials } from '../../utils/helpers';
 
 const TopBar = ({ onMobileMenuClick, pageTitle = "Dashboard" }) => {

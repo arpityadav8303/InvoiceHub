@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { loginUser, loginClient, logoutUser, getCurrentUser, registerUser, saveToken, getToken, removeToken } from '../services/authService';
 import { AuthContext } from './AuthContextType';
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);

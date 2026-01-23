@@ -4,7 +4,7 @@ import FormInput from './FormInput';
 import PasswordInput from './PasswordInput';
 import FormButton from './FormButton';
 import FormErrorMessage from './FormErrorMessage';
-import { useAuth } from '../../context/AuthContext'; // Import Context Hook
+import { useAuth } from '../../hooks/useAuth'; // Import Context Hook
 import { ERROR_MESSAGES } from '../../utils/constants';
 
 function LoginForm() {

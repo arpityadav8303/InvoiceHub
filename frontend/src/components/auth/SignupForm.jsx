@@ -4,7 +4,7 @@ import FormInput from './FormInput';
 import PasswordInput from './PasswordInput';
 import FormButton from './FormButton';
 import FormErrorMessage from './FormErrorMessage';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { ERROR_MESSAGES, BUSINESS_TYPES } from '../../utils/constants';
 
 function SignupForm() {

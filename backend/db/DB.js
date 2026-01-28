@@ -17,7 +17,7 @@ const connectdb = async () => {
     }
 
     const db = await mongoose.connect(process.env.MONGO_URI, {
-      dbName: "Khata", // Ensure we connect to the correct DB
+      // dbName: "Khata", // Removed to use default from URI
     });
 
     isConnected = db.connections[0].readyState;

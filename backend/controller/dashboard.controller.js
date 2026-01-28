@@ -3,159 +3,160 @@ import Invoice from '../models/invoice.model.js';
 import Payment from '../models/payment.model.js';
 import mongoose from 'mongoose';
 
-export const getDashboardOverview = async (req, res) => {
+// --- 1. Key Metrics & Stats (Fast) ---
+export const getDashboardStats = async (req, res) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user._id);
+
+    // parallelize independent queries
+    const [clientStats, invoiceStats] = await Promise.all([
+      // Client Stats
+      Client.aggregate([
+        { $match: { userId } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            active: { $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] } },
+            inactive: { $sum: { $cond: [{ $eq: ["$status", "inactive"] }, 1, 0] } }
+          }
+        }
+      ]),
+      // Invoice Stats
+      Invoice.aggregate([
+        { $match: { userId } },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: "$total" },
+            totalPaid: { $sum: "$paidAmount" },
+            outstanding: { $sum: "$remainingAmount" },
+            overdue: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $lt: ["$dueDate", new Date()] },
+                      { $ne: ["$status", "paid"] }
+                    ]
+                  },
+                  "$remainingAmount",
+                  0
+                ]
+              }
+            },
+            paidCount: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, 1, 0] } },
+            pendingCount: { $sum: { $cond: [{ $in: ["$status", ["sent", "partially_paid", "draft"]] }, 1, 0] } },
+            overdueCount: { $sum: { $cond: [{ $and: [{ $lt: ["$dueDate", new Date()] }, { $ne: ["$status", "paid"] }] }, 1, 0] } }
+          }
+        }
+      ])
+    ]);
+
+    const stats = invoiceStats[0] || {};
+    const clients = clientStats[0] || { total: 0, active: 0, inactive: 0 };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalClients: { active: clients.active, inactive: clients.inactive },
+        totalRevenue: stats.totalRevenue || 0,
+        outstandingAmount: stats.outstanding || 0,
+        overdueAmount: stats.overdue || 0,
+        paymentRate: stats.totalRevenue ? Math.round((stats.totalPaid / stats.totalRevenue) * 100) : 0,
+        invoiceStats: {
+          paid: stats.paidCount || 0,
+          pending: stats.pendingCount || 0,
+          overdue: stats.overdueCount || 0
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Dashboard Stats Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// --- 2. Chart Data (Heavier Aggregations) ---
+export const getDashboardCharts = async (req, res) => {
   try {
     const userId = new mongoose.Types.ObjectId(req.user._id);
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-    sixMonthsAgo.setDate(1); // Start of the month
+    sixMonthsAgo.setDate(1);
     sixMonthsAgo.setHours(0, 0, 0, 0);
 
-    // 1. Total Clients Stats
-    const clientStatsPromise = Client.aggregate([
-      { $match: { userId } },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-          active: { $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] } },
-          inactive: { $sum: { $cond: [{ $eq: ["$status", "inactive"] }, 1, 0] } }
-        }
+    const [revenueGraph, clientGrowth] = await Promise.all([
+      // Monthly Revenue
+      Payment.aggregate([
+        {
+          $match: {
+            userId,
+            paymentDate: { $gte: sixMonthsAgo }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              month: { $month: "$paymentDate" },
+              year: { $year: "$paymentDate" }
+            },
+            total: { $sum: "$amount" }
+          }
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } }
+      ]),
+      // Client Growth
+      Client.aggregate([
+        {
+          $match: {
+            userId,
+            createdAt: { $gte: sixMonthsAgo }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              month: { $month: "$createdAt" },
+              year: { $year: "$createdAt" }
+            },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } }
+      ])
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        revenueData: fillMissingMonths(revenueGraph, sixMonthsAgo, 'total'),
+        clientGrowthData: fillMissingMonths(clientGrowth, sixMonthsAgo, 'count')
       }
+    });
+
+  } catch (error) {
+    console.error("Dashboard Charts Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// --- 3. Recent Activity & Lists (DB Fetches) ---
+export const getDashboardActivity = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const [recentPayments, recentInvoices, recentClients, upcomingInvoices] = await Promise.all([
+      Payment.find({ userId }).sort({ paymentDate: -1 }).limit(5).populate('clientId', 'firstName lastName').lean(),
+      Invoice.find({ userId }).sort({ createdAt: -1 }).limit(5).populate('clientId', 'firstName lastName').lean(),
+      Client.find({ userId }).sort({ createdAt: -1 }).limit(5).lean(),
+      Invoice.find({
+        userId,
+        status: { $ne: 'paid' },
+        dueDate: { $gte: new Date() }
+      }).sort({ dueDate: 1 }).limit(5).populate('clientId', 'firstName lastName companyName').lean()
     ]);
 
-    // 2. Revenue & Invoice Stats
-    const invoiceStatsPromise = Invoice.aggregate([
-      { $match: { userId } },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: "$total" },
-          totalPaid: { $sum: "$paidAmount" },
-          outstanding: { $sum: "$remainingAmount" },
-          overdue: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $lt: ["$dueDate", new Date()] },
-                    { $ne: ["$status", "paid"] }
-                  ]
-                },
-                "$remainingAmount",
-                0
-              ]
-            }
-          },
-          paidCount: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, 1, 0] } },
-          pendingCount: { $sum: { $cond: [{ $in: ["$status", ["sent", "partially_paid", "draft"]] }, 1, 0] } },
-          overdueCount: { $sum: { $cond: [{ $and: [{ $lt: ["$dueDate", new Date()] }, { $ne: ["$status", "paid"] }] }, 1, 0] } }
-        }
-      }
-    ]);
-
-    // 3. Monthly Revenue (Last 6 Months)
-    const revenueGraphPromise = Payment.aggregate([
-      {
-        $match: {
-          userId,
-          paymentDate: { $gte: sixMonthsAgo }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            month: { $month: "$paymentDate" },
-            year: { $year: "$paymentDate" }
-          },
-          total: { $sum: "$amount" }
-        }
-      },
-      { $sort: { "_id.year": 1, "_id.month": 1 } }
-    ]);
-
-    // 4. Client Growth (Last 6 Months)
-    const clientGrowthPromise = Client.aggregate([
-      {
-        $match: {
-          userId,
-          createdAt: { $gte: sixMonthsAgo }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            month: { $month: "$createdAt" },
-            year: { $year: "$createdAt" }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { "_id.year": 1, "_id.month": 1 } }
-    ]);
-
-    // 5. Recent Activity (Latest 5 items)
-    const recentPaymentsPromise = Payment.find({ userId })
-      .sort({ paymentDate: -1 })
-      .limit(5)
-      .populate('clientId', 'firstName lastName')
-      .lean();
-
-    const recentInvoicesPromise = Invoice.find({ userId })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate('clientId', 'firstName lastName')
-      .lean();
-
-    const recentClientsPromise = Client.find({ userId })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean();
-
-    // 6. Upcoming Invoices
-    const upcomingInvoicesPromise = Invoice.find({
-      userId,
-      status: { $ne: 'paid' },
-      dueDate: { $gte: new Date() }
-    })
-      .sort({ dueDate: 1 })
-      .limit(5)
-      .populate('clientId', 'firstName lastName companyName')
-      .lean();
-
-    const [
-      clientStatsRes,
-      invoiceStatsRes,
-      revenueGraph,
-      clientGrowth,
-      recentPayments,
-      recentInvoices,
-      recentClients,
-      upcomingInvoices
-    ] = await Promise.all([
-      clientStatsPromise,
-      invoiceStatsPromise,
-      revenueGraphPromise,
-      clientGrowthPromise,
-      recentPaymentsPromise,
-      recentInvoicesPromise,
-      recentClientsPromise,
-      upcomingInvoicesPromise
-    ]);
-
-    // --- Process Data for Frontend ---
-
-    // Invoice Stats
-    const stats = invoiceStatsRes[0] || {};
-    const clients = clientStatsRes[0] || { total: 0, active: 0, inactive: 0 };
-
-    // Process Revenue Graph - Fill missing months
-    const processedRevenueData = fillMissingMonths(revenueGraph, sixMonthsAgo, 'total');
-
-    // Process Client Growth - Fill missing months
-    const processedClientGrowth = fillMissingMonths(clientGrowth, sixMonthsAgo, 'count');
-
-    // Merge and Sort Recent Activity
     const activityList = [
       ...recentPayments.map(p => ({
         id: p._id,
@@ -174,7 +175,7 @@ export const getDashboardOverview = async (req, res) => {
       ...recentClients.map(c => ({
         id: c._id,
         type: 'client',
-        message: `New client "${c.businessName}" added`,
+        message: `New client "${c.companyName || c.firstName}" added`,
         time: c.createdAt
       }))
     ]
@@ -184,25 +185,6 @@ export const getDashboardOverview = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        // Key Stats
-        totalClients: { active: clients.active, inactive: clients.inactive },
-        totalRevenue: stats.totalRevenue || 0,
-        outstandingAmount: stats.outstanding || 0,
-        overdueAmount: stats.overdue || 0,
-        paymentRate: stats.totalRevenue ? Math.round((stats.totalPaid / stats.totalRevenue) * 100) : 0,
-
-        // Charts Data
-        revenueData: processedRevenueData,
-        clientGrowthData: processedClientGrowth,
-
-        // Pie Chart Data
-        invoiceStats: {
-          paid: stats.paidCount || 0,
-          pending: stats.pendingCount || 0,
-          overdue: stats.overdueCount || 0
-        },
-
-        // Lists
         recentActivity: activityList,
         upcomingInvoices: upcomingInvoices.map(inv => ({
           id: inv.invoiceNumber,
@@ -213,10 +195,17 @@ export const getDashboardOverview = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Dashboard overview error:", error);
+    console.error("Dashboard Activity Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Deprecated: Kept effectively for any legacy calls, but client should move to new endpoints.
+// We can actually just remove it if we update the frontend. Since we are updating the frontend, I will remove the old massive controller.
+export const getDashboardOverview = async (req, res) => {
+  res.status(410).json({ message: "This endpoint is deprecated. Use /stats, /charts, and /activity instead." });
+};
+
 
 // Helper: Fill missing months with 0
 function fillMissingMonths(data, startDate, valueKey) {

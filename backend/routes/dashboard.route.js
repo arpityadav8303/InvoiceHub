@@ -1,11 +1,22 @@
-import express from 'express';
-import { getDashboardOverview,getRevenueAnalytics,getRevenueSummary,getAdvancedClientList,getClientProfile } from '../controller/dashboard.controller.js';
+import {
+  getDashboardStats,
+  getDashboardCharts,
+  getDashboardActivity,
+  getDashboardOverview,
+  getRevenueAnalytics,
+  getRevenueSummary,
+  getAdvancedClientList,
+  getClientProfile
+} from '../controller/dashboard.controller.js';
 import { protect } from '../middleware/auth.middleware.js'; // Ensure user is logged in
 import rateLimiter from '../middleware/rate-limitor.js'
 import { getClientRiskAssessment } from '../controller/userRiskAssesment.controller.js';
 const router = express.Router();
 
-router.get('/overview', protect, getDashboardOverview);
+router.get('/overview', protect, getDashboardOverview); // Deprecated
+router.get('/stats', protect, getDashboardStats);
+router.get('/charts', protect, getDashboardCharts);
+router.get('/activity', protect, getDashboardActivity);
 router.get(
   '/revenue',
   rateLimiter({ limit: 20, windowMinutes: 60 }),
